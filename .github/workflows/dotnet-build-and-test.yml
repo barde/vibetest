@@ -1,8 +1,11 @@
 name: .NET Build and Test
 
 on:
-  push:
   pull_request:
+  push:
+    branches-ignore:
+      - master
+      - main
 
 jobs:
   build:
