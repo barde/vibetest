@@ -25,4 +25,4 @@ jobs:
         run: dotnet build CopilotBlazor.sln --configuration Release --no-restore
 
       - name: Run tests
-        run: dotnet test CopilotBlazor.sln --no-build --verbosity normal
+        run: dotnet test CopilotBlazor.sln --verbosity normal
