@@ -31,6 +31,13 @@ jobs:
           echo "random=$RANDOM_SUFFIX" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
         shell: pwsh
 
+      - name: Ensure Resource Group exists
+        uses: azure/cli@v2
+        with:
+          azcliversion: latest
+          inlineScript: |
+            az group create --name ${{ secrets.AZURE_RESOURCE_GROUP }} --location westeurope
+
       - name: Deploy Bicep
         uses: azure/arm-deploy@v1
         with:
