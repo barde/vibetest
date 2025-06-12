@@ -33,6 +33,6 @@ jobs:
           template: infra/main.bicep
           parameters: >-
             functionAppName=${{ secrets.AZURE_RESOURCE_GROUP }}${{ steps.random.outputs.random }} \
-            storageAccountName=${{ secrets.AZURE_RESOURCE_GROUP | toLower }}${{ steps.random.outputs.random }} \
-            keyVaultName=${{ secrets.AZURE_RESOURCE_GROUP | toLower }}${{ steps.random.outputs.random }}
+            storageAccountName=${{ secrets.AZURE_RESOURCE_GROUP }}${{ steps.random.outputs.random }} \
+            keyVaultName=${{ secrets.AZURE_RESOURCE_GROUP }}${{ steps.random.outputs.random }}
           failOnStdErr: false
