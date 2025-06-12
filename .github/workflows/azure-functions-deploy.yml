@@ -1,0 +1,41 @@
+# Deploy ASP.NET Core Server to Azure Functions
+# This workflow builds, tests, and deploys the Server project as an Azure Function App
+
+name: Build, Test, and Deploy to Azure Functions
+
+on:
+  push:
+    branches: [ master, main ]
+  pull_request:
+    branches: [ master, main ]
+
+jobs:
+  build-and-deploy:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 9 SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+
+      - name: Restore dependencies
+        run: dotnet restore CopilotBlazor.sln
+
+      - name: Build solution
+        run: dotnet build CopilotBlazor.sln --configuration Release --no-restore
+
+      - name: Run tests
+        run: dotnet test CopilotBlazor.sln --verbosity normal
+
+      - name: Publish Azure Function
+        run: dotnet publish Server/Server.csproj --configuration Release --output ./publish
+
+      - name: Deploy to Azure Functions
+        uses: Azure/functions-action@v1
+        with:
+          app-name: ${{ secrets.AZURE_FUNCTIONAPP_NAME }}
+          package: ./publish
+          publish-profile: ${{ secrets.AZURE_FUNCTIONAPP_PUBLISH_PROFILE }}
