@@ -36,7 +36,7 @@ jobs:
         with:
           subscriptionId: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
           resourceGroupName: ${{ secrets.AZURE_RESOURCE_GROUP }}
-          template: infra/main.bicep
+          template: Infra/main.bicep
           parameters: >-
             functionAppName=${{ secrets.AZURE_RESOURCE_GROUP }}${{ steps.random.outputs.random }} \
             storageAccountName=${{ secrets.AZURE_RESOURCE_GROUP }}${{ steps.random.outputs.random }} \
