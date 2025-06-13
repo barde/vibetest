@@ -108,7 +108,7 @@ resource functionApp 'Microsoft.Web/sites@2023-01-01' = {
         }
         {
           name: 'FUNCTIONS_WORKER_RUNTIME'
-          value: 'dotnet'
+          value: 'dotnet-isolated'
         }
         {
           name: 'WEBSITE_RUN_FROM_PACKAGE'
@@ -137,6 +137,72 @@ resource functionApp 'Microsoft.Web/sites@2023-01-01' = {
     environment: 'production'
   }
 }
+// Keep-alive availability test to prevent cold starts
+resource keepAliveTest 'Microsoft.Insights/webtests@2022-06-15' = {
+  name: '${functionAppName}-keepalive-test'
+  location: location
+  kind: 'ping'
+  properties: {
+    SyntheticMonitorId: '${functionAppName}-keepalive-test'
+    Name: '${functionAppName} Keep Alive Test'
+    Description: 'Pings the keep-alive endpoint every 5 minutes to prevent cold starts'
+    Enabled: true
+    Frequency: 300 // 5 minutes
+    Timeout: 30
+    Kind: 'ping'
+    RetryEnabled: true
+    Locations: [
+      {
+        Id: 'us-ca-sjc-azr'
+      }
+      {
+        Id: 'us-tx-sn1-azr'
+      }
+      {
+        Id: 'us-il-ch1-azr'
+      }
+    ]
+    Configuration: {
+      WebTest: '<WebTest Name="${functionAppName} Keep Alive Test" Id="ABD48585-0831-40CB-9069-682EA6BB3583" Enabled="True" CssProjectStructure="" CssIteration="" Timeout="30" WorkItemIds="" xmlns="http://microsoft.com/schemas/VisualStudio/TeamTest/2010" Description="" CredentialUserName="" CredentialPassword="" PreAuthenticate="True" Proxy="default" StopOnError="False" RecordedResultFile="" ResultsLocale=""><Items><Request Method="GET" Guid="a5f10126-e4cd-570d-961c-cea43999a200" Version="1.1" Url="https://${functionAppName}.azurewebsites.net/api/keepalive" ThinkTime="0" Timeout="30" ParseDependentRequests="False" FollowRedirects="True" RecordResult="True" Cache="False" ResponseTimeGoal="0" Encoding="utf-8" ExpectedHttpStatusCode="200" ExpectedResponseUrl="" ReportingName="" IgnoreHttpStatusCode="False" /></Items></WebTest>'
+    }
+  }
+  tags: {
+    'hidden-link:${appInsights.id}': 'Resource'
+    environment: 'production'
+  }
+}
+
+// Alert rule for keep-alive test failures
+resource keepAliveAlert 'Microsoft.Insights/metricAlerts@2018-03-01' = {
+  name: '${functionAppName}-keepalive-alert'
+  location: 'global'
+  properties: {
+    description: 'Alert when keep-alive test fails'
+    severity: 2
+    enabled: true
+    scopes: [
+      keepAliveTest.id
+    ]
+    evaluationFrequency: 'PT1M'
+    windowSize: 'PT5M'
+    criteria: {
+      'odata.type': 'Microsoft.Azure.Monitor.SingleResourceMultipleMetricCriteria'
+      allOf: [
+        {
+          name: 'KeepAliveFailure'
+          metricName: 'availabilityResults/availabilityPercentage'
+          operator: 'LessThan'
+          threshold: 80
+          timeAggregation: 'Average'
+        }
+      ]
+    }
+  }
+  tags: {
+    environment: 'production'
+  }
+}
+
 output appInsightsName string = appInsights.name
 
 // Key Vault Access Policy for Function App (using parent property for clarity)

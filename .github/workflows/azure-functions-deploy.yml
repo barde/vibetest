@@ -5,9 +5,9 @@ name: Build, Test, and Deploy to Azure Functions
 
 on:
   push:
-    branches: [ master, main ]
+    branches: [ master, main, feature/azure-functions-migration ]
   pull_request:
-    branches: [ master, main ]
+    branches: [ master, main, feature/azure-functions-migration ]
 
 permissions:
   id-token: write
@@ -23,10 +23,10 @@ jobs:
       - name: Set base resource name
         run: echo "AZURE_BASE_NAME=copilotblazor5zvgphnc" >> $GITHUB_ENV
 
-      - name: Setup .NET 9 SDK
+      - name: Setup .NET 8 SDK
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '9.0.x'
+          dotnet-version: '8.0.x'
 
       - name: Restore dependencies
         run: dotnet restore CopilotBlazor.sln
