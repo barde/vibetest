@@ -101,7 +101,6 @@ resource functionApp 'Microsoft.Web/sites@2023-01-01' = {
           value: '1'
         }
       ]
-      // alwaysOn is not supported for Consumption plan (Y1)
       ftpsState: 'Disabled'
       minTlsVersion: '1.2'
     }
