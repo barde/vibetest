@@ -5,3 +5,8 @@ Always check online documentation for the latest features and best practices.
 Write and check unit tests for both frontend and backend to ensure code quality.
 Use the az and gh CLI tools for Azure and GitHub operations, respectively.
 Do not teach me but do the work yourself.
+**ALWAYS deploy infrastructure and application using the GitHub Actions workflows in `.github/workflows`. NEVER use direct az CLI or local/agent-side deployment for infrastructure.**
+Use the provided GitHub Actions workflows for CI/CD and all Azure deployments.
+Use the `dotnet` CLI for building, testing, and running the projects.
+Use the `dotnet watch` command for live reloading during development.
+Use the `dotnet ef` CLI for database migrations and updates.
