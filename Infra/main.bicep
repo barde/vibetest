@@ -101,7 +101,7 @@ resource functionApp 'Microsoft.Web/sites@2023-01-01' = {
           value: '1'
         }
       ]
-      alwaysOn: true
+      // alwaysOn is not supported for Consumption plan (Y1)
       ftpsState: 'Disabled'
       minTlsVersion: '1.2'
     }
@@ -110,12 +110,13 @@ resource functionApp 'Microsoft.Web/sites@2023-01-01' = {
   tags: {
     environment: 'production'
   }
-  dependsOn: [storage, plan]
+  // dependsOn is not needed; Bicep infers dependencies
 }
 
 // Key Vault Access Policy for Function App
 resource kvAccess 'Microsoft.KeyVault/vaults/accessPolicies@2023-02-01' = {
-  name: '${keyVault.name}/add'
+  name: 'add'
+  parent: keyVault
   properties: {
     accessPolicies: [
       {
@@ -127,7 +128,7 @@ resource kvAccess 'Microsoft.KeyVault/vaults/accessPolicies@2023-02-01' = {
       }
     ]
   }
-  dependsOn: [keyVault, functionApp]
+  // dependsOn is not needed; Bicep infers dependencies
 }
 
 output functionAppName string = functionApp.name
