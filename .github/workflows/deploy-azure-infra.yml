@@ -48,3 +48,10 @@ jobs:
           parameters: >
             functionAppName=${{ steps.random.outputs.base_name }} storageAccountName=${{ steps.random.outputs.base_name }} keyVaultName=${{ steps.random.outputs.base_name }}
           failOnStdErr: false
+
+      - name: Output resource names
+        run: |
+          echo "Resource Group: ${{ steps.random.outputs.base_name }}"
+          echo "Function App Name: ${{ steps.random.outputs.base_name }}"
+          echo "Storage Account Name: ${{ steps.random.outputs.base_name }}"
+          echo "Key Vault Name: ${{ steps.random.outputs.base_name }}"
