@@ -105,14 +105,14 @@ resource functionApp 'Microsoft.Web/sites@2023-01-01' = {
       minTlsVersion: '1.2'
     }
     httpsOnly: true
+    // AlwaysOn is not set (Consumption plan does not support it)
   }
   tags: {
     environment: 'production'
   }
-  // No explicit dependsOn needed; Bicep infers dependencies
 }
 
-// Key Vault Access Policy for Function App
+// Key Vault Access Policy for Function App (using parent property for clarity)
 resource kvAccess 'Microsoft.KeyVault/vaults/accessPolicies@2023-02-01' = {
   name: 'add'
   parent: keyVault
@@ -127,7 +127,6 @@ resource kvAccess 'Microsoft.KeyVault/vaults/accessPolicies@2023-02-01' = {
       }
     ]
   }
-  // No explicit dependsOn needed; Bicep infers dependencies
 }
 
 output functionAppName string = functionApp.name

@@ -27,8 +27,9 @@ jobs:
       - name: Generate random suffix
         id: random
         run: |
-          $RANDOM_SUFFIX = -join ((48..57) + (97..122) | Get-Random -Count 6 | % {[char]$_})
-          echo "random=$RANDOM_SUFFIX" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          $RANDOM_SUFFIX = -join ((48..57) + (97..122) | Get-Random -Count 8 | % {[char]$_})
+          $BASE_NAME = "copilotblazor$RANDOM_SUFFIX"
+          echo "base_name=$BASE_NAME" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
         shell: pwsh
 
       - name: Ensure Resource Group exists
@@ -36,14 +37,14 @@ jobs:
         with:
           azcliversion: latest
           inlineScript: |
-            az group create --name ${{ secrets.AZURE_RESOURCE_GROUP }} --location westeurope
+            az group create --name ${{ steps.random.outputs.base_name }} --location westeurope
 
       - name: Deploy Bicep
         uses: azure/arm-deploy@v1
         with:
           subscriptionId: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-          resourceGroupName: ${{ secrets.AZURE_RESOURCE_GROUP }}
+          resourceGroupName: ${{ steps.random.outputs.base_name }}
           template: Infra/main.bicep
           parameters: >
-            functionAppName=${{ secrets.AZURE_RESOURCE_GROUP }}${{ steps.random.outputs.random }} storageAccountName=${{ secrets.AZURE_RESOURCE_GROUP }}${{ steps.random.outputs.random }} keyVaultName=${{ secrets.AZURE_RESOURCE_GROUP }}${{ steps.random.outputs.random }}
+            functionAppName=${{ steps.random.outputs.base_name }} storageAccountName=${{ steps.random.outputs.base_name }} keyVaultName=${{ steps.random.outputs.base_name }}
           failOnStdErr: false
