@@ -1,3 +1,17 @@
+// Application Insights
+resource appInsights 'Microsoft.Insights/components@2020-02-02' = {
+  name: '${functionAppName}-ai'
+  location: location
+  kind: 'web'
+  properties: {
+    Application_Type: 'web'
+    Flow_Type: 'Redfield'
+    WorkspaceResourceId: ''
+  }
+  tags: {
+    environment: 'production'
+  }
+}
 // main.bicep
 // Deploys an Azure Function App, Storage Account, and Key Vault with best practices
 
@@ -100,6 +114,18 @@ resource functionApp 'Microsoft.Web/sites@2023-01-01' = {
           name: 'WEBSITE_RUN_FROM_PACKAGE'
           value: '1'
         }
+        {
+          name: 'APPINSIGHTS_INSTRUMENTATIONKEY'
+          value: appInsights.properties.InstrumentationKey
+        }
+        {
+          name: 'APPLICATIONINSIGHTS_CONNECTION_STRING'
+          value: appInsights.properties.ConnectionString
+        }
+        {
+          name: 'ApplicationInsightsAgent_EXTENSION_VERSION'
+          value: '~3'
+        }
       ]
       ftpsState: 'Disabled'
       minTlsVersion: '1.2'
@@ -111,6 +137,7 @@ resource functionApp 'Microsoft.Web/sites@2023-01-01' = {
     environment: 'production'
   }
 }
+output appInsightsName string = appInsights.name
 
 // Key Vault Access Policy for Function App (using parent property for clarity)
 resource kvAccess 'Microsoft.KeyVault/vaults/accessPolicies@2023-02-01' = {
