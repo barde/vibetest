@@ -26,5 +26,11 @@
     "maxOutstandingRequests": 200,
     "maxConcurrentRequests": 100,
     "dynamicThrottlesEnabled": true
+  },
+  "cors": {
+    "allowedOrigins": ["*"],
+    "allowedMethods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    "allowedHeaders": ["Content-Type", "Authorization"],
+    "maxAge": "86400"
   }
 }
