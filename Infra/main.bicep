@@ -16,10 +16,15 @@ resource appInsights 'Microsoft.Insights/components@2020-02-02' = {
 // Deploys an Azure Function App, Storage Account, and Key Vault with best practices
 
 param location string = resourceGroup().location
-param functionAppName string
-param storageAccountName string
-param keyVaultName string
+param baseName string = 'copilotblazor'
+param environment string = 'prod'
 param skuName string = 'Y1' // Consumption plan for Functions
+
+// Generate unique resource names using base name and unique string
+var uniqueSuffix = substring(uniqueString(resourceGroup().id), 0, 8)
+var functionAppName = '${baseName}-func-${environment}-${uniqueSuffix}'
+var storageAccountName = '${baseName}st${environment}${uniqueSuffix}'
+var keyVaultName = '${baseName}-kv-${environment}-${uniqueSuffix}'
 
 // Storage Account
 resource storage 'Microsoft.Storage/storageAccounts@2023-01-01' = {

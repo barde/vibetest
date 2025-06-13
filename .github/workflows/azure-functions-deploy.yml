@@ -1,32 +1,39 @@
-# Deploy ASP.NET Core Server to Azure Functions
-# This workflow builds, tests, and deploys the Server project as an Azure Function App
+# Build, Test, and Deploy Azure Functions App
+# This workflow builds, tests, and deploys only the application code
+# Infrastructure deployment should be handled separately
 
-name: Build, Test, and Deploy to Azure Functions
+name: Build, Test, and Deploy Azure Functions
 
 on:
   push:
-    branches: [ master, main, feature/azure-functions-migration ]
+    branches: [ master, main ]
   pull_request:
-    branches: [ master, main, feature/azure-functions-migration ]
+    branches: [ master, main ]
 
 permissions:
   id-token: write
   contents: read
 
 jobs:
-  build-and-deploy:
+  build-and-test:
     runs-on: windows-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set base resource name
-        run: echo "AZURE_BASE_NAME=copilotblazor5zvgphnc" >> $GITHUB_ENV
+      - name: Validate required secrets
+        run: |
+          $baseName = "${{ secrets.AZURE_BASE_NAME }}"
+          if ([string]::IsNullOrEmpty($baseName)) {
+            Write-Error "AZURE_BASE_NAME secret is required but not set. Please configure this secret in your repository settings."
+            exit 1
+          }
+          echo "AZURE_BASE_NAME=$baseName" >> $env:GITHUB_ENV
 
-      - name: Setup .NET 8 SDK
+      - name: Setup .NET 9 SDK
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '8.0.x'
+          dotnet-version: '9.0.x'
 
       - name: Restore dependencies
         run: dotnet restore CopilotBlazor.sln
@@ -36,6 +43,31 @@ jobs:
 
       - name: Run tests
         run: dotnet test CopilotBlazor.sln --verbosity normal
+
+      - name: Publish Azure Function
+        run: dotnet publish Server/Server.csproj --configuration Release --output ./publish
+
+  deploy:
+    runs-on: windows-latest
+    needs: build-and-test
+    if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main'
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Validate required secrets
+        run: |
+          $baseName = "${{ secrets.AZURE_BASE_NAME }}"
+          if ([string]::IsNullOrEmpty($baseName)) {
+            Write-Error "AZURE_BASE_NAME secret is required but not set. Please configure this secret in your repository settings."
+            exit 1
+          }
+          echo "AZURE_BASE_NAME=$baseName" >> $env:GITHUB_ENV
+
+      - name: Setup .NET 9 SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
 
       - name: Publish Azure Function
         run: dotnet publish Server/Server.csproj --configuration Release --output ./publish
@@ -50,6 +82,6 @@ jobs:
       - name: Deploy to Azure Functions
         uses: Azure/functions-action@v1
         with:
-          app-name: ${{ secrets.AZURE_BASE_NAME }}
+          app-name: ${{ env.AZURE_BASE_NAME }}-func-prod
           package: ./publish
           publish-profile: ${{ secrets.AZURE_FUNCTIONAPP_PUBLISH_PROFILE }}
