@@ -109,7 +109,7 @@ resource functionApp 'Microsoft.Web/sites@2023-01-01' = {
   tags: {
     environment: 'production'
   }
-  // dependsOn is not needed; Bicep infers dependencies
+  // No explicit dependsOn needed; Bicep infers dependencies
 }
 
 // Key Vault Access Policy for Function App
@@ -127,7 +127,7 @@ resource kvAccess 'Microsoft.KeyVault/vaults/accessPolicies@2023-02-01' = {
       }
     ]
   }
-  // dependsOn is not needed; Bicep infers dependencies
+  // No explicit dependsOn needed; Bicep infers dependencies
 }
 
 output functionAppName string = functionApp.name
