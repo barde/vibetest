@@ -10,7 +10,7 @@ param skuName string = 'Y1' // Consumption plan for Functions
 var uniqueSuffix = substring(uniqueString(resourceGroup().id), 0, 8)
 var functionAppName = '${baseName}-func-${environment}-${uniqueSuffix}'
 var storageAccountName = '${substring(baseName, 0, min(length(baseName), 10))}${uniqueSuffix}' // Simplified for storage naming requirements
-var keyVaultName = '${baseName}-kv-${environment}-${uniqueSuffix}'
+var keyVaultName = '${baseName}-kv-${uniqueSuffix}' // Simplified for KV naming requirements (3-24 chars, no consecutive hyphens)
 var staticWebAppName = '${baseName}-swa-${environment}-${uniqueSuffix}'
 
 // Application Insights
@@ -243,8 +243,8 @@ resource staticWebApp 'Microsoft.Web/staticSites@2023-01-01' = {
     tier: 'Free'
   }
   properties: {
-    repositoryUrl: '' // Will be configured during GitHub integration
-    branch: 'main'
+    repositoryUrl: 'https://github.com/barde/vibetest' // Set actual repository URL
+    branch: 'master' // Use master instead of main
     buildProperties: {
       appLocation: '/Client'
       apiLocation: '' // We'll link to existing Azure Functions
