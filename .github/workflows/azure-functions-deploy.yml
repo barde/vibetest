@@ -29,7 +29,6 @@ jobs:
   test:
     if: github.event_name == 'pull_request'
     runs-on: windows-latest
-    name: Test Azure Functions
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -45,10 +44,9 @@ jobs:
       - name: Build solution
         run: dotnet build CopilotBlazor.sln --configuration Release --no-restore
 
-      - name: Run Server Tests
-        run: dotnet test Server.Tests/Server.Tests.csproj --verbosity normal
+      - name: Run tests
+        run: dotnet test CopilotBlazor.sln --verbosity normal
 
-  # Build and test job for pushes (preparation for deployment)
   build-and-test:
     if: github.event_name == 'push'
     runs-on: windows-latest
@@ -56,14 +54,20 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Validate required secrets
+      - name: Set naming variables
         run: |
-          $baseName = "${{ secrets.AZURE_BASE_NAME }}"
-          if ([string]::IsNullOrEmpty($baseName)) {
-            Write-Error "AZURE_BASE_NAME secret is required but not set. Please configure this secret in your repository settings."
-            exit 1
-          }
-          echo "AZURE_BASE_NAME=$baseName" >> $env:GITHUB_ENV
+          # Using simplified naming convention: func-cpltst-prod
+          $workloadName = "cpltst"
+          $environment = "prod"
+          $functionAppName = "func-$workloadName-$environment"
+          $resourceGroupName = "rg-$workloadName-$environment"
+          
+          echo "FUNCTION_APP_NAME=$functionAppName" >> $env:GITHUB_ENV
+          echo "RESOURCE_GROUP_NAME=$resourceGroupName" >> $env:GITHUB_ENV
+          
+          Write-Host "📋 Using simplified naming convention:"
+          Write-Host "Function App: $functionAppName"
+          Write-Host "Resource Group: $resourceGroupName"
 
       - name: Setup .NET 9 SDK
         uses: actions/setup-dotnet@v4
@@ -90,22 +94,20 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Validate required secrets
+      - name: Set naming variables
         run: |
-          $baseName = "${{ secrets.AZURE_BASE_NAME }}"
-          if ([string]::IsNullOrEmpty($baseName)) {
-            Write-Error "AZURE_BASE_NAME secret is required but not set. Please configure this secret in your repository settings."
-            exit 1
-          }
-          echo "AZURE_BASE_NAME=$baseName" >> $env:GITHUB_ENV
-
-      - name: Setup .NET 9 SDK
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: '9.0.x'
-
-      - name: Publish Azure Function
-        run: dotnet publish Server/Server.csproj --configuration Release --output ./publish
+          # Using simplified naming convention: func-cpltst-prod
+          $workloadName = "cpltst"
+          $environment = "prod"
+          $functionAppName = "func-$workloadName-$environment"
+          $resourceGroupName = "rg-$workloadName-$environment"
+          
+          echo "FUNCTION_APP_NAME=$functionAppName" >> $env:GITHUB_ENV
+          echo "RESOURCE_GROUP_NAME=$resourceGroupName" >> $env:GITHUB_ENV
+          
+          Write-Host "📋 Using simplified naming convention:"
+          Write-Host "Function App: $functionAppName"
+          Write-Host "Resource Group: $resourceGroupName"
 
       - name: Azure Login
         uses: azure/login@v2
@@ -114,9 +116,18 @@ jobs:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
+      - name: Setup .NET 9 SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+
+      - name: Restore and publish
+        run: |
+          dotnet restore CopilotBlazor.sln
+          dotnet publish Server/Server.csproj --configuration Release --output ./publish
+
       - name: Deploy to Azure Functions
         uses: Azure/functions-action@v1
         with:
-          app-name: ${{ env.AZURE_BASE_NAME }}-func-prod
-          package: ./publish
-          publish-profile: ${{ secrets.AZURE_FUNCTIONAPP_PUBLISH_PROFILE }}
+          app-name: ${{ env.FUNCTION_APP_NAME }}
+          package: './publish'

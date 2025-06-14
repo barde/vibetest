@@ -1,6 +1,6 @@
-# Build and Deploy Blazor WebAssembly to Azure Static Web Apps
-# This workflow builds and deploys the Blazor client to Azure Static Web Apps
-# with automatic API integration to the Azure Functions backend
+# Deploy Blazor WebAssembly to Azure Static Web Apps
+# This workflow deploys only the frontend application
+# Infrastructure deployment should be handled separately
 
 name: Deploy Blazor to Azure Static Web Apps
 
@@ -17,7 +17,6 @@ on:
       - 'Client/**'
       - '.github/workflows/deploy-static-web-apps.yml'
       - 'Client.Tests/**'
-    types: [opened, synchronize, reopened, closed]
 
 permissions:
   id-token: write
@@ -25,11 +24,10 @@ permissions:
   pull-requests: write
 
 jobs:
-  # Test job for pull requests - build and test only
   test:
-    if: github.event_name == 'pull_request' && github.event.action != 'closed'
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
-    name: Test Blazor Client
+    name: Test Blazor App (PR)
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -40,27 +38,18 @@ jobs:
           dotnet-version: '9.0.x'
 
       - name: Restore dependencies
-        run: dotnet restore Client/Client.csproj
+        run: dotnet restore CopilotBlazor.sln
 
-      - name: Build Blazor WebAssembly
+      - name: Build Client
         run: dotnet build Client/Client.csproj --configuration Release --no-restore
 
-      - name: Run Client Tests
+      - name: Test Client
         run: dotnet test Client.Tests/Client.Tests.csproj --verbosity normal
 
-      - name: Test Summary
-        if: always()
-        run: |
-          echo "## 🌐 Blazor Client Test Results" >> $GITHUB_STEP_SUMMARY
-          echo "✅ Client build completed successfully" >> $GITHUB_STEP_SUMMARY
-          echo "✅ Client tests executed" >> $GITHUB_STEP_SUMMARY
-          echo "🚀 Ready for deployment to Azure Static Web Apps" >> $GITHUB_STEP_SUMMARY
-
-  # Build and deploy job for pushes to main
-  build_and_deploy:
-    if: github.event_name == 'push'
+  build-and-deploy:
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main')
     runs-on: ubuntu-latest
-    name: Build and Deploy Job
+    name: Build and Deploy Blazor App
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -73,13 +62,20 @@ jobs:
         with:
           dotnet-version: '9.0.x'
 
-      - name: Validate required secrets
+      - name: Set naming variables
         run: |
-          if [ -z "${{ secrets.AZURE_BASE_NAME }}" ]; then
-            echo "::error::AZURE_BASE_NAME secret is required but not set."
-            echo "::error::Please run the infrastructure deployment first and set this secret."
-            exit 1
-          fi
+          # Using simplified naming convention: swa-cpltst-prod
+          WORKLOAD_NAME="cpltst"
+          ENVIRONMENT="prod"
+          SWA_NAME="swa-$WORKLOAD_NAME-$ENVIRONMENT"
+          RESOURCE_GROUP="rg-$WORKLOAD_NAME-$ENVIRONMENT"
+          
+          echo "SWA_NAME=$SWA_NAME" >> $GITHUB_ENV
+          echo "RESOURCE_GROUP_NAME=$RESOURCE_GROUP" >> $GITHUB_ENV
+          
+          echo "📋 Using simplified naming convention:"
+          echo "Static Web App: $SWA_NAME"
+          echo "Resource Group: $RESOURCE_GROUP"
 
       - name: Azure Login
         uses: azure/login@v2
@@ -91,45 +87,42 @@ jobs:
       - name: Get Static Web Apps deployment token
         id: swa-token
         run: |
-          RESOURCE_GROUP="${{ secrets.AZURE_BASE_NAME }}"
-          # Get the Static Web App name from the resource group (there should be only one)
-          SWA_NAME=$(az staticwebapp list --resource-group "$RESOURCE_GROUP" --query "[0].name" --output tsv)
-          if [ -z "$SWA_NAME" ] || [ "$SWA_NAME" = "null" ]; then
-            echo "::error::No Static Web App found in resource group $RESOURCE_GROUP"
+          RESOURCE_GROUP="${{ env.RESOURCE_GROUP_NAME }}"
+          # Get the deployment token for the Static Web App
+          SWA_TOKEN=$(az staticwebapp secrets list --name "${{ env.SWA_NAME }}" --resource-group "$RESOURCE_GROUP" --query "properties.apiKey" --output tsv)
+          if [ -z "$SWA_TOKEN" ] || [ "$SWA_TOKEN" = "null" ]; then
+            echo "::error::No Static Web App found: ${{ env.SWA_NAME }} in resource group $RESOURCE_GROUP"
             echo "::error::Please ensure the infrastructure has been deployed first"
             exit 1
           fi
-          echo "Found Static Web App: $SWA_NAME"
-          SWA_TOKEN=$(az staticwebapp secrets list --name "$SWA_NAME" --resource-group "$RESOURCE_GROUP" --query "properties.apiKey" --output tsv)
           echo "::add-mask::$SWA_TOKEN"
           echo "token=$SWA_TOKEN" >> $GITHUB_OUTPUT
 
-      - name: Restore dependencies
-        run: dotnet restore Client/Client.csproj
-
-      - name: Build Blazor WebAssembly
-        run: dotnet publish Client/Client.csproj --configuration Release --output ./dist
-
-      - name: Deploy to Azure Static Web Apps
-        id: builddeploy
+      - name: Build and Deploy
         uses: Azure/static-web-apps-deploy@v1
         with:
           azure_static_web_apps_api_token: ${{ steps.swa-token.outputs.token }}
-          repo_token: ${{ secrets.GITHUB_TOKEN }} # Used for GitHub integrations (i.e. PR comments)
-          action: "upload"
-          ###### Repository/Build Configurations ######
-          app_location: "/Client" # App source code path
-          api_location: "" # Api source code path - optional (linked to Azure Functions)
-          output_location: "wwwroot" # Built app content directory
-          ###### End of Repository/Build Configurations ######
-          app_build_command: 'dotnet publish --configuration Release --output ../dist'
-          skip_api_build: true # We use linked Azure Functions for API
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          action: 'upload'
+          app_location: '/Client'
+          output_location: 'wwwroot'
 
-  close_pull_request:
+  close-pull-request:
     if: github.event_name == 'pull_request' && github.event.action == 'closed'
     runs-on: ubuntu-latest
-    name: Close Pull Request Job
+    name: Close Pull Request
     steps:
+      - name: Set naming variables
+        run: |
+          # Using simplified naming convention: swa-cpltst-prod
+          WORKLOAD_NAME="cpltst"
+          ENVIRONMENT="prod"
+          SWA_NAME="swa-$WORKLOAD_NAME-$ENVIRONMENT"
+          RESOURCE_GROUP="rg-$WORKLOAD_NAME-$ENVIRONMENT"
+          
+          echo "SWA_NAME=$SWA_NAME" >> $GITHUB_ENV
+          echo "RESOURCE_GROUP_NAME=$RESOURCE_GROUP" >> $GITHUB_ENV
+
       - name: Azure Login
         uses: azure/login@v2
         with:
@@ -140,23 +133,19 @@ jobs:
       - name: Get Static Web Apps deployment token
         id: swa-token
         run: |
-          RESOURCE_GROUP="${{ secrets.AZURE_BASE_NAME }}"
-          # Get the Static Web App name from the resource group (there should be only one)
-          SWA_NAME=$(az staticwebapp list --resource-group "$RESOURCE_GROUP" --query "[0].name" --output tsv)
-          if [ -z "$SWA_NAME" ] || [ "$SWA_NAME" = "null" ]; then
-            echo "::error::No Static Web App found in resource group $RESOURCE_GROUP"
+          RESOURCE_GROUP="${{ env.RESOURCE_GROUP_NAME }}"
+          # Get the deployment token for the Static Web App
+          SWA_TOKEN=$(az staticwebapp secrets list --name "${{ env.SWA_NAME }}" --resource-group "$RESOURCE_GROUP" --query "properties.apiKey" --output tsv)
+          if [ -z "$SWA_TOKEN" ] || [ "$SWA_TOKEN" = "null" ]; then
+            echo "::error::No Static Web App found: ${{ env.SWA_NAME }} in resource group $RESOURCE_GROUP"
             echo "::error::Please ensure the infrastructure has been deployed first"
             exit 1
           fi
-          echo "Found Static Web App: $SWA_NAME"
-          SWA_TOKEN=$(az staticwebapp secrets list --name "$SWA_NAME" --resource-group "$RESOURCE_GROUP" --query "properties.apiKey" --output tsv)
           echo "::add-mask::$SWA_TOKEN"
           echo "token=$SWA_TOKEN" >> $GITHUB_OUTPUT
 
       - name: Close Pull Request
-        id: closepullrequest
         uses: Azure/static-web-apps-deploy@v1
         with:
           azure_static_web_apps_api_token: ${{ steps.swa-token.outputs.token }}
-          action: "close"
-          app_location: "/Client"
+          action: 'close'
