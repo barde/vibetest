@@ -9,7 +9,7 @@ param skuName string = 'Y1' // Consumption plan for Functions
 // Generate unique resource names using base name and unique string
 var uniqueSuffix = substring(uniqueString(resourceGroup().id), 0, 8)
 var functionAppName = '${baseName}-func-${environment}-${uniqueSuffix}'
-var storageAccountName = '${baseName}st${environment}${uniqueSuffix}'
+var storageAccountName = '${substring(baseName, 0, min(length(baseName), 10))}${uniqueSuffix}' // Simplified for storage naming requirements
 var keyVaultName = '${baseName}-kv-${environment}-${uniqueSuffix}'
 var staticWebAppName = '${baseName}-swa-${environment}-${uniqueSuffix}'
 
