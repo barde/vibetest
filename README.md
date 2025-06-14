@@ -10,7 +10,7 @@ Modern Blazor WebAssembly + Azure Functions application with automated deploymen
 - ⚡ **Server**: Azure Functions v4 backend (.NET 9) 
 - 📦 **Shared**: Common models library (Azure API Guidelines compliant)
 - 🏛️ **Infra**: Bicep infrastructure as code
-- 📚 **docs/**: OpenAPI 3.0.3 specification
+- 📚 **Docs**: OpenAPI 3.0.3 specification
 
 ## 🚀 Features
 
@@ -69,7 +69,7 @@ Uses **GitHub Actions with OIDC** for secure, keyless deployment.
 | `GET /api/health` | Application health status |
 | `GET /api/keepalive` | Service availability check |
 
-Complete OpenAPI 3.0.3 specification available in `docs/openapi.yaml`.
+Complete OpenAPI 3.0.3 specification available in `Docs/openapi.yaml`.
 
 ---
 
