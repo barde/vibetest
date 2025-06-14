@@ -9,14 +9,14 @@ on:
     branches: [ '**' ]
     paths:
       - 'Server/**'
-      - '.github/workflows/azure-functions-deploy.yml'
+      - '.github/workflows/deploy-server.yml'
       - 'Server.Tests/**'
       - 'CopilotBlazor.sln'
   pull_request:
     branches: [ master, main ]
     paths:
       - 'Server/**'
-      - '.github/workflows/azure-functions-deploy.yml'
+      - '.github/workflows/deploy-server.yml'
       - 'Server.Tests/**'
       - 'CopilotBlazor.sln'
 

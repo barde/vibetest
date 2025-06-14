@@ -1,0 +1,132 @@
+# Deploy Blazor WebAssembly to Azure Static Web Apps
+# Step 1: Build and test on any branch push
+# Step 2: Deploy only on master branch
+
+name: Deploy Blazor to Azure Static Web Apps
+
+on:
+  push:
+    branches: [ '**' ]
+    paths:
+      - 'Client/**'
+      - '.github/workflows/deploy-client.yml'
+      - 'Client.Tests/**'
+  pull_request:
+    branches: [ master, main ]
+    paths:
+      - 'Client/**'
+      - '.github/workflows/deploy-client.yml'
+      - 'Client.Tests/**'
+
+permissions:
+  id-token: write
+  contents: read
+  pull-requests: write
+
+env:
+  WORKLOAD_NAME: cpltst
+  ENVIRONMENT: prod
+
+jobs:
+  # Step 1: Build and test on all branch pushes
+  build-and-test:
+    name: Build and Test Blazor Client
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+          lfs: false
+
+      - name: Setup .NET 9 SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+
+      - name: Restore dependencies
+        run: dotnet restore CopilotBlazor.sln
+
+      - name: Build Client project
+        run: dotnet build Client/Client.csproj --configuration Release --no-restore
+
+      - name: Run Client tests
+        run: dotnet test Client.Tests/Client.Tests.csproj --verbosity normal
+
+  # Step 2: Deploy only on master branch
+  deploy-to-azure:
+    name: Deploy to Azure Static Web Apps
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main')
+    runs-on: ubuntu-latest
+    needs: build-and-test
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+          lfs: false
+
+      - name: Setup .NET 9 SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+
+      - name: Azure Login via OIDC
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Get Static Web Apps deployment token
+        id: token
+        run: |
+          SWA_NAME="swa-${{ env.WORKLOAD_NAME }}-${{ env.ENVIRONMENT }}"
+          RG_NAME="rg-${{ env.WORKLOAD_NAME }}-${{ env.ENVIRONMENT }}"
+          
+          TOKEN=$(az staticwebapp secrets list --name "$SWA_NAME" --resource-group "$RG_NAME" --query "properties.apiKey" -o tsv)
+          if [ -z "$TOKEN" ] || [ "$TOKEN" = "null" ]; then
+            echo "::error::Static Web App '$SWA_NAME' not found. Deploy infrastructure first."
+            exit 1
+          fi
+          echo "::add-mask::$TOKEN"
+          echo "value=$TOKEN" >> $GITHUB_OUTPUT
+
+      - name: Deploy to Azure Static Web Apps
+        uses: Azure/static-web-apps-deploy@v1
+        with:
+          azure_static_web_apps_api_token: ${{ steps.token.outputs.value }}
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          action: 'upload'
+          app_location: '/Client'
+          output_location: 'wwwroot'
+
+  # Handle PR closure
+  close-pull-request:
+    name: Close Pull Request Environment
+    if: github.event_name == 'pull_request' && github.event.action == 'closed'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Azure Login via OIDC
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Get Static Web Apps deployment token
+        id: token
+        run: |
+          SWA_NAME="swa-${{ env.WORKLOAD_NAME }}-${{ env.ENVIRONMENT }}"
+          RG_NAME="rg-${{ env.WORKLOAD_NAME }}-${{ env.ENVIRONMENT }}"
+          
+          TOKEN=$(az staticwebapp secrets list --name "$SWA_NAME" --resource-group "$RG_NAME" --query "properties.apiKey" -o tsv)
+          echo "::add-mask::$TOKEN"
+          echo "value=$TOKEN" >> $GITHUB_OUTPUT
+
+      - name: Close Pull Request Environment
+        uses: Azure/static-web-apps-deploy@v1
+        with:
+          azure_static_web_apps_api_token: ${{ steps.token.outputs.value }}
+          action: 'close'
+          app_location: '/Client'
