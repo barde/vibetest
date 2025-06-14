@@ -96,12 +96,11 @@ Each workflow only runs when relevant files change:
 - **Push to main**: Full build, test, and deployment
 - **Manual trigger**: Infrastructure deployment via `workflow_dispatch`
 
-### Main Coordinator
-The `main-ci-cd.yml` workflow provides:
-- Change detection across components
-- Visual summary of affected areas
-- Coordinated test execution for PRs
-- Status reporting in GitHub Actions
+### Benefits
+- **Reduced build times** - Only affected components build
+- **Lower costs** - Less compute usage on both GitHub Actions and Azure
+- **Parallel deployments** - Independent workflows can run simultaneously
+- **Clear separation** - Each workflow focuses on its specific component
 
 This ensures you only deploy what's changed, reducing build times and Azure consumption.
 

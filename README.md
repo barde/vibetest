@@ -97,7 +97,6 @@ The application deploys to Azure Static Web Apps for the frontend and Azure Func
 
 ### Deployment Workflows
 
-- 🔄 **Main Pipeline**: `.github/workflows/main-ci-cd.yml` - Detects changes and coordinates builds
 - 🏗️ **Infrastructure**: `.github/workflows/deploy-azure-infra.yml` - Deploys when `Infra/` changes
 - 🌐 **Frontend**: `.github/workflows/deploy-static-web-apps.yml` - Deploys when `Client/` changes
 - ⚡ **Backend**: `.github/workflows/azure-functions-deploy.yml` - Deploys when `Server/` changes
@@ -106,9 +105,9 @@ The application deploys to Azure Static Web Apps for the frontend and Azure Func
 
 The workflows are optimized for monorepo efficiency:
 - **Path-based triggers** - Only run when relevant files change
-- **Separate test jobs** - Fast feedback for pull requests
+- **Separate test jobs** - Fast feedback for pull requests  
 - **Component isolation** - Independent deployments for each service
-- **Change detection** - Visual summary of what components are affected
+- **Automatic coordination** - GitHub Actions handles scheduling and dependencies
 
 ### Live URLs
 
