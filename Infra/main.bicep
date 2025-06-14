@@ -14,6 +14,9 @@ param environment string = 'prod'
 @description('The SKU name for the Function App service plan')
 param functionAppSku string = 'Y1' // Consumption plan for Functions
 
+@description('Whether to link Static Web App to Azure Functions (can cause long deployments)')
+param enableApiLinking bool = false
+
 // Fixed location: West Europe
 var location = 'westeurope'
 
@@ -267,8 +270,8 @@ resource staticWebApp 'Microsoft.Web/staticSites@2023-01-01' = {
   }
 }
 
-// Link Static Web Apps to existing Azure Functions for API
-resource staticWebAppApiLink 'Microsoft.Web/staticSites/linkedBackends@2023-01-01' = {
+// Link Static Web Apps to existing Azure Functions for API (optional due to deployment timeouts)
+resource staticWebAppApiLink 'Microsoft.Web/staticSites/linkedBackends@2023-01-01' = if (enableApiLinking) {
   name: 'azure-functions-backend'
   parent: staticWebApp
   properties: {
