@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 using Moq;
 using Server.Functions;
+using CopilotBlazor.Shared.Models;
 
 namespace Server.Tests;
 

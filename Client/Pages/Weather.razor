@@ -1,5 +1,6 @@
 ﻿@page "/weather"
 @inject HttpClient Http
+@using CopilotBlazor.Shared.Models
 
 <PageTitle>Weather</PageTitle>
 
@@ -67,21 +68,8 @@ else
                 errorMessage = $"Failed to load weather data: {ex.Message}. Please try again later.";
             }
         }
-    }
-
-    private async Task RetryLoad()
+    }    private async Task RetryLoad()
     {
         await LoadWeatherData();
-    }
-
-    public class WeatherForecast
-    {
-        public DateOnly Date { get; set; }
-
-        public int TemperatureC { get; set; }
-
-        public string? Summary { get; set; }
-
-        public int TemperatureF => 32 + (int)(TemperatureC / 0.5556);
     }
 }

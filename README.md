@@ -13,6 +13,8 @@ This AI-generated solution contains:
 - 🧪 `Client.Tests`: xUnit tests for the frontend
 - 🔬 `Server.Tests`: xUnit tests for the backend
 - 🏛️ `Infra`: Bicep infrastructure as code for Azure deployment
+- 📦 `Shared`: Common models and constants library (Azure API Guidelines compliant)
+- 📚 `docs/`: OpenAPI 3.0.3 specification and API documentation
 
 ## 🚀 Features
 
@@ -24,6 +26,45 @@ This AI-generated solution contains:
 - 🔄 **CI/CD**: GitHub Actions for automated build, test, and deployment
 - 🏗️ **Infrastructure as Code**: Bicep templates for consistent deployments
 - 🔒 **Security**: Custom headers, CORS configuration, and built-in authentication support
+- 📖 **OpenAPI Specification**: Complete API documentation following Azure API Guidelines
+- 🔗 **Shared Models**: Type-safe models shared between client and server
+
+## 📖 API Documentation
+
+This project includes a comprehensive OpenAPI 3.0.3 specification (`docs/openapi.yaml`) that follows Azure API Guidelines:
+
+### 🛠️ API Endpoints
+
+| Endpoint | Method | Description | Response Format |
+|----------|--------|-------------|----------------|
+| `/api/weatherforecast` | GET | 5-day weather forecast | JSON Array |
+| `/api/health` | GET | Application health status | JSON Object |
+| `/api/keepalive` | GET | Service availability check | JSON Object |
+
+### 📋 Features
+
+- 🎯 **Azure API Guidelines Compliance**: Consistent error handling, status codes, and response formats
+- 🔍 **Complete Schema Definitions**: All request/response models with validation rules
+- 📊 **Error Response Standards**: Standardized error format across all endpoints
+- 🔄 **CORS Documentation**: Cross-origin resource sharing configuration
+- 📈 **Status Code Coverage**: Comprehensive HTTP status code usage documentation
+- 🛡️ **Security Schemas**: Authentication and authorization patterns (ready for future implementation)
+
+### 🏗️ Shared Models Library
+
+The `Shared` project provides:
+- 📦 **Common Data Models**: `WeatherForecast`, `HealthCheckResponse`, `KeepAliveResponse`
+- 🛠️ **API Constants**: Route definitions, status codes, content types, CORS policies
+- 🔧 **Extension Methods**: JSON serialization, error handling, validation utilities
+- 📋 **Validation Attributes**: Data annotations for consistent validation
+- 🔍 **Swagger Annotations**: Rich API documentation metadata
+
+All models follow Azure API Guidelines with:
+- 🎯 Consistent property naming (camelCase in JSON)
+- ✅ Comprehensive validation rules
+- 📝 Rich XML documentation
+- 🔧 Custom error response formats
+- 🕒 ISO 8601 datetime handling
 
 ## 🆚 Hosting Comparison
 
@@ -47,7 +88,30 @@ This AI-generated solution contains:
 
 ## 💻 Local Development
 
-### 🔨 Build
+### � Project Structure
+
+```
+CopilotBlazor/
+├── 📂 Client/                    # Blazor WebAssembly frontend
+│   ├── Pages/                    # Razor pages and components
+│   ├── Layout/                   # App layout components
+│   └── wwwroot/                  # Static assets
+├── 📂 Server/                    # Azure Functions backend
+│   ├── Functions/                # HTTP trigger functions
+│   └── Properties/               # Launch settings
+├── 📂 Shared/                    # Common models and constants
+│   ├── Models/                   # Data transfer objects
+│   ├── Constants/                # API routes and status codes
+│   └── Extensions/               # Utility extension methods
+├── 📂 Client.Tests/              # Frontend unit tests
+├── 📂 Server.Tests/              # Backend unit tests
+├── 📂 Infra/                     # Bicep infrastructure templates
+├── 📂 docs/                      # API documentation
+│   └── openapi.yaml              # OpenAPI 3.0.3 specification
+└── 📂 .github/workflows/         # CI/CD automation
+```
+
+### �🔨 Build
 ```bash
 dotnet build CopilotBlazor.sln
 ```

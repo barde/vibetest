@@ -4,6 +4,9 @@ using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Logging;
 using System.Net;
 using System.Text.Json;
+using CopilotBlazor.Shared.Models;
+using CopilotBlazor.Shared.Constants;
+using CopilotBlazor.Shared.Extensions;
 
 namespace Server.Functions;
 
@@ -21,9 +24,9 @@ public class HealthCheckFunction : IHealthCheck
         _logger.LogInformation("Performing health check");
         // Add actual health check logic here
         return Task.FromResult(HealthCheckResult.Healthy("All systems operational"));
-    }[Function("HealthCheck")]
+    }    [Function("HealthCheck")]
     public async Task<HttpResponseData> HttpHealthCheck(
-        [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "health")] HttpRequestData req,
+        [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = ApiRoutes.Health.Check)] HttpRequestData req,
         HealthCheckService healthCheckService)
     {
         _logger.LogInformation("Health check request received");
@@ -34,24 +37,24 @@ public class HealthCheckFunction : IHealthCheck
             : HttpStatusCode.ServiceUnavailable;
 
         var response = req.CreateResponse(status);
-        response.Headers.Add("Content-Type", "application/json; charset=utf-8");
+        response.Headers.Add("Content-Type", ContentTypes.Json);
         
-        var result = new {
-            status = healthReport.Status.ToString(),
-            duration = healthReport.TotalDuration,
-            checks = healthReport.Entries.Select(e => new {
-                name = e.Key,
-                status = e.Value.Status.ToString(),
-                description = e.Value.Description,
-                duration = e.Value.Duration
+        var healthCheckResponse = new HealthCheckResponse
+        {
+            Status = healthReport.Status.ToString(),
+            Duration = healthReport.TotalDuration,
+            Timestamp = DateTime.UtcNow,
+            Checks = healthReport.Entries.Select(e => new HealthCheckEntry
+            {
+                Name = e.Key,
+                Status = e.Value.Status.ToString(),
+                Description = e.Value.Description,
+                Duration = e.Value.Duration,
+                Data = e.Value.Data?.ToDictionary(x => x.Key, x => x.Value)
             })
         };
 
-        await response.WriteStringAsync(JsonSerializer.Serialize(result, new JsonSerializerOptions
-        {
-            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-            WriteIndented = true
-        }));
+        await response.WriteStringAsync(healthCheckResponse.ToJson(compact: true));
 
         return response;
     }

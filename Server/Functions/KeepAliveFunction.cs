@@ -2,6 +2,9 @@ using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.Extensions.Logging;
 using System.Net;
+using CopilotBlazor.Shared.Models;
+using CopilotBlazor.Shared.Constants;
+using CopilotBlazor.Shared.Extensions;
 
 namespace Server.Functions;
 
@@ -12,23 +15,27 @@ public class KeepAliveFunction
     public KeepAliveFunction(ILogger<KeepAliveFunction> logger)
     {
         _logger = logger;
-    }
-
-    [Function("KeepAlive")]
+    }    [Function("KeepAlive")]
     public HttpResponseData KeepAlive(
-        [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "keepalive")] HttpRequestData req)
+        [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = ApiRoutes.Health.KeepAlive)] HttpRequestData req)
     {
         _logger.LogInformation("Keep-alive ping received at {time}", DateTime.UtcNow);
 
+        var keepAliveResponse = ResponseExtensions.CreateKeepAliveResponse(new Dictionary<string, object>
+        {
+            ["functionName"] = "KeepAlive",
+            ["version"] = "1.0.0"
+        });
+
         var response = req.CreateResponse(HttpStatusCode.OK);
-        response.Headers.Add("Content-Type", "application/json; charset=utf-8");
+        response.Headers.Add("Content-Type", ContentTypes.Json);
         
         // Add CORS headers
-        response.Headers.Add("Access-Control-Allow-Origin", "*");
+        response.Headers.Add("Access-Control-Allow-Origin", CorsPolicy.AllowAllOrigins);
         response.Headers.Add("Access-Control-Allow-Methods", "GET, OPTIONS");
         response.Headers.Add("Access-Control-Allow-Headers", "Content-Type");
 
-        response.WriteString($"{{\"status\":\"alive\",\"timestamp\":\"{DateTime.UtcNow:yyyy-MM-ddTHH:mm:ssZ}\"}}");
+        response.WriteString(keepAliveResponse.ToJson(compact: true));
 
         return response;
     }
