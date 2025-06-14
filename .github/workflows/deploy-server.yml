@@ -5,6 +5,22 @@
 name: Build and Deploy Azure Functions
 
 on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Deployment environment'
+        required: true
+        default: 'prod'
+        type: choice
+        options:
+        - dev
+        - test
+        - prod
+      force_deploy:
+        description: 'Force deployment even if no changes detected'
+        required: false
+        default: false
+        type: boolean
   push:
     branches: [ '**' ]
     paths:
@@ -26,7 +42,7 @@ permissions:
 
 env:
   WORKLOAD_NAME: cpltst
-  ENVIRONMENT: prod
+  ENVIRONMENT: ${{ github.event.inputs.environment || 'prod' }}
 
 jobs:
   # Step 1: Build and test on all branch pushes
@@ -53,11 +69,12 @@ jobs:
 
       - name: Publish Azure Function (for validation)
         run: dotnet publish Server/Server.csproj --configuration Release --output ./publish
-
-  # Step 2: Deploy only on master branch
+  # Step 2: Deploy on master branch or manual trigger
   deploy-to-azure:
     name: Deploy to Azure Functions
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main')
+    if: |
+      (github.event_name == 'push' && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main')) ||
+      (github.event_name == 'workflow_dispatch')
     runs-on: windows-latest
     needs: build-and-test
     steps:
