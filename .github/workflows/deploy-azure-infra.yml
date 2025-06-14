@@ -5,6 +5,11 @@ name: Deploy Azure Infra (Bicep)
 
 on:
   workflow_dispatch:
+  push:
+    branches: [ master, main ]
+    paths:
+      - 'Infra/**'
+      - '.github/workflows/deploy-azure-infra.yml'
 
 permissions:
   id-token: write

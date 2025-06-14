@@ -7,15 +7,50 @@ name: Build, Test, and Deploy Azure Functions
 on:
   push:
     branches: [ master, main ]
+    paths:
+      - 'Server/**'
+      - '.github/workflows/azure-functions-deploy.yml'
+      - 'Server.Tests/**'
+      - 'CopilotBlazor.sln'
   pull_request:
     branches: [ master, main ]
+    paths:
+      - 'Server/**'
+      - '.github/workflows/azure-functions-deploy.yml'
+      - 'Server.Tests/**'
+      - 'CopilotBlazor.sln'
 
 permissions:
   id-token: write
   contents: read
 
 jobs:
+  # Test job for pull requests - build and test only
+  test:
+    if: github.event_name == 'pull_request'
+    runs-on: windows-latest
+    name: Test Azure Functions
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 9 SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+
+      - name: Restore dependencies
+        run: dotnet restore CopilotBlazor.sln
+
+      - name: Build solution
+        run: dotnet build CopilotBlazor.sln --configuration Release --no-restore
+
+      - name: Run Server Tests
+        run: dotnet test Server.Tests/Server.Tests.csproj --verbosity normal
+
+  # Build and test job for pushes (preparation for deployment)
   build-and-test:
+    if: github.event_name == 'push'
     runs-on: windows-latest
     steps:
       - name: Checkout repository

@@ -1,0 +1,86 @@
+# Main CI/CD Pipeline - Orchestrates builds based on changed files
+# This workflow determines what components have changed and triggers appropriate builds
+
+name: Main CI/CD Pipeline
+
+on:
+  push:
+    branches: [ master, main ]
+  pull_request:
+    branches: [ master, main ]
+
+permissions:
+  id-token: write
+  contents: read
+  pull-requests: write
+
+jobs:
+  detect-changes:
+    runs-on: ubuntu-latest
+    name: Detect Changed Components
+    outputs:
+      client-changed: ${{ steps.changes.outputs.client }}
+      server-changed: ${{ steps.changes.outputs.server }}
+      infra-changed: ${{ steps.changes.outputs.infra }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Detect changes
+        uses: dorny/paths-filter@v3
+        id: changes
+        with:
+          filters: |
+            client:
+              - 'Client/**'
+              - 'Client.Tests/**'
+              - '.github/workflows/deploy-static-web-apps.yml'
+            server:
+              - 'Server/**'
+              - 'Server.Tests/**'
+              - '.github/workflows/azure-functions-deploy.yml'
+              - 'CopilotBlazor.sln'
+            infra:
+              - 'Infra/**'
+              - '.github/workflows/deploy-azure-infra.yml'
+
+  run-all-tests:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    name: Run All Tests (PR)
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 9 SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+
+      - name: Restore dependencies
+        run: dotnet restore CopilotBlazor.sln
+
+      - name: Build solution
+        run: dotnet build CopilotBlazor.sln --configuration Release --no-restore
+
+      - name: Run all tests
+        run: dotnet test CopilotBlazor.sln --verbosity normal
+
+  summary:
+    if: always()
+    needs: [detect-changes, run-all-tests]
+    runs-on: ubuntu-latest
+    name: Build Summary
+    steps:
+      - name: Summary
+        run: |
+          echo "## Build Summary" >> $GITHUB_STEP_SUMMARY
+          echo "| Component | Changed | Action |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----------|---------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Client (Blazor) | ${{ needs.detect-changes.outputs.client-changed }} | ${{ needs.detect-changes.outputs.client-changed == 'true' && 'Will deploy to Static Web Apps' || 'No changes detected' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Server (Functions) | ${{ needs.detect-changes.outputs.server-changed }} | ${{ needs.detect-changes.outputs.server-changed == 'true' && 'Will deploy to Azure Functions' || 'No changes detected' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Infrastructure | ${{ needs.detect-changes.outputs.infra-changed }} | ${{ needs.detect-changes.outputs.infra-changed == 'true' && 'Will update Azure resources' || 'No changes detected' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Next Steps" >> $GITHUB_STEP_SUMMARY
+          echo "- Individual component workflows will trigger automatically for changed components" >> $GITHUB_STEP_SUMMARY
+          echo "- Check the Actions tab for component-specific deployment progress" >> $GITHUB_STEP_SUMMARY

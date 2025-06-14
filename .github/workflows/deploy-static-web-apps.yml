@@ -7,8 +7,16 @@ name: Deploy Blazor to Azure Static Web Apps
 on:
   push:
     branches: [ master, main ]
+    paths:
+      - 'Client/**'
+      - '.github/workflows/deploy-static-web-apps.yml'
+      - 'Client.Tests/**'
   pull_request:
     branches: [ master, main ]
+    paths:
+      - 'Client/**'
+      - '.github/workflows/deploy-static-web-apps.yml'
+      - 'Client.Tests/**'
     types: [opened, synchronize, reopened, closed]
 
 permissions:
@@ -17,8 +25,32 @@ permissions:
   pull-requests: write
 
 jobs:
+  # Test job for pull requests - build and test only
+  test:
+    if: github.event_name == 'pull_request' && github.event.action != 'closed'
+    runs-on: ubuntu-latest
+    name: Test Blazor Client
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 9 SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+
+      - name: Restore dependencies
+        run: dotnet restore Client/Client.csproj
+
+      - name: Build Blazor WebAssembly
+        run: dotnet build Client/Client.csproj --configuration Release --no-restore
+
+      - name: Run Client Tests
+        run: dotnet test Client.Tests/Client.Tests.csproj --verbosity normal
+
+  # Build and deploy job for pushes to main
   build_and_deploy:
-    if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.action != 'closed')
+    if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.action != 'closed' && contains(github.event.pull_request.labels.*.name, 'deploy-preview'))
     runs-on: ubuntu-latest
     name: Build and Deploy Job
     steps:

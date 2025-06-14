@@ -81,6 +81,30 @@ Unlike Storage Account static hosting, Azure Static Web Apps provides:
 - Staging environments for pull requests
 - API proxy without CORS issues
 
+## Monorepo Workflow Optimization
+
+The CI/CD workflows are designed for efficient monorepo operations:
+
+### Path-Based Triggers
+Each workflow only runs when relevant files change:
+- **Client changes** (`Client/`, `Client.Tests/`) → Static Web Apps deployment
+- **Server changes** (`Server/`, `Server.Tests/`) → Azure Functions deployment  
+- **Infrastructure changes** (`Infra/`) → Bicep template deployment
+
+### Workflow Types
+- **Pull Requests**: Run tests only for fast feedback
+- **Push to main**: Full build, test, and deployment
+- **Manual trigger**: Infrastructure deployment via `workflow_dispatch`
+
+### Main Coordinator
+The `main-ci-cd.yml` workflow provides:
+- Change detection across components
+- Visual summary of affected areas
+- Coordinated test execution for PRs
+- Status reporting in GitHub Actions
+
+This ensures you only deploy what's changed, reducing build times and Azure consumption.
+
 ## Configuration Files
 
 ### `/Client/wwwroot/staticwebapp.config.json`
