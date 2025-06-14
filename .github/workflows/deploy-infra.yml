@@ -15,11 +15,6 @@ on:
         - dev
         - test
         - prod
-  push:
-    branches: [ master, main ]
-    paths:
-      - 'Infra/**'
-      - '.github/workflows/deploy-infra.yml'
 
 permissions:
   id-token: write
