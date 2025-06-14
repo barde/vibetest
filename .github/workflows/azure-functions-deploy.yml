@@ -1,8 +1,4 @@
-# Build, Test, and Deploy Azure Functions App
-# This workflow builds, tests, and deploys only the application code
-# Infrastructure deployment should be handled separately
-
-name: Build, Test, and Deploy Azure Functions
+name: Build and Deploy Azure Functions
 
 on:
   push:
@@ -24,90 +20,41 @@ permissions:
   id-token: write
   contents: read
 
+env:
+  WORKLOAD_NAME: cpltst
+  ENVIRONMENT: prod
+
 jobs:
-  # Test job for pull requests - build and test only
   test:
     if: github.event_name == 'pull_request'
     runs-on: windows-latest
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Setup .NET 9 SDK
-        uses: actions/setup-dotnet@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '9.0.x'
+      - run: dotnet restore CopilotBlazor.sln
+      - run: dotnet build CopilotBlazor.sln --configuration Release --no-restore
+      - run: dotnet test CopilotBlazor.sln --verbosity normal
 
-      - name: Restore dependencies
-        run: dotnet restore CopilotBlazor.sln
-
-      - name: Build solution
-        run: dotnet build CopilotBlazor.sln --configuration Release --no-restore
-
-      - name: Run tests
-        run: dotnet test CopilotBlazor.sln --verbosity normal
-
-  build-and-test:
-    if: github.event_name == 'push'
+  build-and-deploy:
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main')
     runs-on: windows-latest
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Set naming variables
-        run: |
-          # Using simplified naming convention: func-cpltst-prod
-          $workloadName = "cpltst"
-          $environment = "prod"
-          $functionAppName = "func-$workloadName-$environment"
-          $resourceGroupName = "rg-$workloadName-$environment"
-          
-          echo "FUNCTION_APP_NAME=$functionAppName" >> $env:GITHUB_ENV
-          echo "RESOURCE_GROUP_NAME=$resourceGroupName" >> $env:GITHUB_ENV
-          
-          Write-Host "📋 Using simplified naming convention:"
-          Write-Host "Function App: $functionAppName"
-          Write-Host "Resource Group: $resourceGroupName"
-
-      - name: Setup .NET 9 SDK
-        uses: actions/setup-dotnet@v4
+      - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '9.0.x'
 
-      - name: Restore dependencies
-        run: dotnet restore CopilotBlazor.sln
-
-      - name: Build solution
-        run: dotnet build CopilotBlazor.sln --configuration Release --no-restore
-
-      - name: Run tests
-        run: dotnet test CopilotBlazor.sln --verbosity normal
+      - name: Build and test
+        run: |
+          dotnet restore CopilotBlazor.sln
+          dotnet build CopilotBlazor.sln --configuration Release --no-restore
+          dotnet test CopilotBlazor.sln --verbosity normal
 
       - name: Publish Azure Function
         run: dotnet publish Server/Server.csproj --configuration Release --output ./publish
-
-  deploy:
-    runs-on: windows-latest
-    needs: build-and-test
-    if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main'
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Set naming variables
-        run: |
-          # Using simplified naming convention: func-cpltst-prod
-          $workloadName = "cpltst"
-          $environment = "prod"
-          $functionAppName = "func-$workloadName-$environment"
-          $resourceGroupName = "rg-$workloadName-$environment"
-          
-          echo "FUNCTION_APP_NAME=$functionAppName" >> $env:GITHUB_ENV
-          echo "RESOURCE_GROUP_NAME=$resourceGroupName" >> $env:GITHUB_ENV
-          
-          Write-Host "📋 Using simplified naming convention:"
-          Write-Host "Function App: $functionAppName"
-          Write-Host "Resource Group: $resourceGroupName"
 
       - name: Azure Login
         uses: azure/login@v2
@@ -116,18 +63,8 @@ jobs:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
-      - name: Setup .NET 9 SDK
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: '9.0.x'
-
-      - name: Restore and publish
-        run: |
-          dotnet restore CopilotBlazor.sln
-          dotnet publish Server/Server.csproj --configuration Release --output ./publish
-
       - name: Deploy to Azure Functions
         uses: Azure/functions-action@v1
         with:
-          app-name: ${{ env.FUNCTION_APP_NAME }}
+          app-name: func-${{ env.WORKLOAD_NAME }}-${{ env.ENVIRONMENT }}
           package: './publish'

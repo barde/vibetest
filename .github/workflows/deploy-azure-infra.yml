@@ -1,7 +1,4 @@
-# Deploy Azure Infrastructure with Bicep
-# Simplified deployment for West Europe region
-
-name: Deploy Azure Infra (Bicep)
+name: Deploy Azure Infrastructure
 
 on:
   workflow_dispatch:
@@ -25,17 +22,16 @@ permissions:
   id-token: write
   contents: read
 
+env:
+  WORKLOAD_NAME: cpltst
+  ENVIRONMENT: ${{ github.event.inputs.environment || 'prod' }}
+  LOCATION: westeurope
+
 jobs:
   deploy-infra:
     runs-on: ubuntu-latest
-    env:
-      # Simplified naming convention
-      WORKLOAD_NAME: cpltst
-      ENVIRONMENT: ${{ github.event.inputs.environment || 'prod' }}
-      LOCATION: westeurope  # Fixed to West Europe
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Azure Login
         uses: azure/login@v2
@@ -44,65 +40,44 @@ jobs:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
-      - name: Set naming variables
-        id: naming
+      - name: Create Resource Group
         run: |
-          # Simplified naming convention: rg-{workload}-{environment}
           RG_NAME="rg-${{ env.WORKLOAD_NAME }}-${{ env.ENVIRONMENT }}"
           
-          echo "resource_group_name=${RG_NAME}" >> $GITHUB_OUTPUT
-          echo "workload_name=${{ env.WORKLOAD_NAME }}" >> $GITHUB_OUTPUT
-            echo "📋 Simplified Naming Convention Applied:"
-          echo "Resource Group: ${RG_NAME}"
-          echo "Workload: ${{ env.WORKLOAD_NAME }}"
-          echo "Environment: ${{ env.ENVIRONMENT }}"
-          echo "Location: ${{ env.LOCATION }} (Fixed)"
+          az group create \
+            --name "$RG_NAME" \
+            --location ${{ env.LOCATION }} \
+            --tags \
+              Environment=${{ env.ENVIRONMENT }} \
+              Workload=${{ env.WORKLOAD_NAME }} \
+              ManagedBy="GitHub Actions" \
+              Repository="${{ github.repository }}" \
+              LastDeployed="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 
-      - name: Ensure Resource Group exists
-        uses: azure/cli@v2
-        with:
-          azcliversion: latest
-          inlineScript: |
-            az group create \
-              --name ${{ steps.naming.outputs.resource_group_name }} \
-              --location ${{ env.LOCATION }} \
-              --tags \
-                Environment=${{ env.ENVIRONMENT }} \
-                Workload=${{ env.WORKLOAD_NAME }} \
-                ManagedBy="GitHub Actions" \
-                Repository="${{ github.repository }}" \
-                LastDeployed="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-
-      - name: Deploy Bicep
-        id: bicep-deploy
+      - name: Deploy Bicep Template
+        id: deploy
         uses: azure/arm-deploy@v1
         with:
           scope: resourcegroup
           subscriptionId: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-          resourceGroupName: ${{ steps.naming.outputs.resource_group_name }}
+          resourceGroupName: rg-${{ env.WORKLOAD_NAME }}-${{ env.ENVIRONMENT }}
           template: Infra/main.bicep
           parameters: >
-            workloadName=${{ steps.naming.outputs.workload_name }}
+            workloadName=${{ env.WORKLOAD_NAME }}
             environment=${{ env.ENVIRONMENT }}
           failOnStdErr: false
 
-      - name: Output resource names and next steps
+      - name: Output deployment summary
         run: |
-          echo "🎯 Simplified Azure Deployment Complete!"
-          echo "====================================="
-          echo "Resource Group: ${{ steps.naming.outputs.resource_group_name }}"
+          echo "🎯 Azure Deployment Complete!"
+          echo "========================="
+          echo "Resource Group: rg-${{ env.WORKLOAD_NAME }}-${{ env.ENVIRONMENT }}"
           echo "Environment: ${{ env.ENVIRONMENT }}"
           echo "Location: ${{ env.LOCATION }}"
           echo ""
           echo "📦 Deployed Resources:"
-          echo "Function App: ${{ steps.bicep-deploy.outputs.functionAppName }}"
-          echo "Storage Account: ${{ steps.bicep-deploy.outputs.storageAccountName }}"
-          echo "Key Vault: ${{ steps.bicep-deploy.outputs.keyVaultName }}"
-          echo "Static Web App: ${{ steps.bicep-deploy.outputs.staticWebAppName }}"
-          echo "Static Web App URL: https://${{ steps.bicep-deploy.outputs.staticWebAppUrl }}"
-          echo ""
-          echo "🚀 Next Steps:"
-          echo "1. Deploy your Blazor app using the 'Deploy Blazor to Azure Static Web Apps' workflow"
-          echo "2. The workflow will automatically retrieve the deployment token from Azure"
-          echo ""
-          echo "💡 Simplified resource naming for easier management"
+          echo "Function App: ${{ steps.deploy.outputs.functionAppName }}"
+          echo "Storage Account: ${{ steps.deploy.outputs.storageAccountName }}"
+          echo "Key Vault: ${{ steps.deploy.outputs.keyVaultName }}"
+          echo "Static Web App: ${{ steps.deploy.outputs.staticWebAppName }}"
+          echo "Static Web App URL: https://${{ steps.deploy.outputs.staticWebAppUrl }}"

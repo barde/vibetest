@@ -3,27 +3,16 @@ name: .NET Build and Test
 on:
   pull_request:
   push:
-    branches-ignore:
-      - master
-      - main
+    branches-ignore: [ master, main ]
 
 jobs:
   build:
     runs-on: windows-latest
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Setup .NET 9 SDK
-        uses: actions/setup-dotnet@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '9.0.x'
-
-      - name: Restore dependencies
-        run: dotnet restore CopilotBlazor.sln
-
-      - name: Build solution
-        run: dotnet build CopilotBlazor.sln --configuration Release --no-restore
-
-      - name: Run tests
-        run: dotnet test CopilotBlazor.sln --verbosity normal
+      - run: dotnet restore CopilotBlazor.sln
+      - run: dotnet build CopilotBlazor.sln --configuration Release --no-restore
+      - run: dotnet test CopilotBlazor.sln --verbosity normal
