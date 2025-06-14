@@ -1,0 +1,75 @@
+# Build and Deploy Blazor WebAssembly to Azure Static Web Apps
+# This workflow builds and deploys the Blazor client to Azure Static Web Apps
+# with automatic API integration to the Azure Functions backend
+
+name: Deploy Blazor to Azure Static Web Apps
+
+on:
+  push:
+    branches: [ master, main ]
+  pull_request:
+    branches: [ master, main ]
+    types: [opened, synchronize, reopened, closed]
+
+permissions:
+  id-token: write
+  contents: read
+  pull-requests: write
+
+jobs:
+  build_and_deploy:
+    if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.action != 'closed')
+    runs-on: ubuntu-latest
+    name: Build and Deploy Job
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+          lfs: false
+
+      - name: Setup .NET 9 SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+
+      - name: Validate required secrets
+        run: |
+          if [ -z "${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}" ]; then
+            echo "::error::AZURE_STATIC_WEB_APPS_API_TOKEN secret is required but not set."
+            echo "::error::Please run the infrastructure deployment first to create the Static Web App resource."
+            exit 1
+          fi
+
+      - name: Restore dependencies
+        run: dotnet restore Client/Client.csproj
+
+      - name: Build Blazor WebAssembly
+        run: dotnet publish Client/Client.csproj --configuration Release --output ./dist
+
+      - name: Deploy to Azure Static Web Apps
+        id: builddeploy
+        uses: Azure/static-web-apps-deploy@v1
+        with:
+          azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
+          repo_token: ${{ secrets.GITHUB_TOKEN }} # Used for GitHub integrations (i.e. PR comments)
+          action: "upload"
+          ###### Repository/Build Configurations ######
+          app_location: "/Client" # App source code path
+          api_location: "" # Api source code path - optional (linked to Azure Functions)
+          output_location: "wwwroot" # Built app content directory
+          ###### End of Repository/Build Configurations ######
+          app_build_command: 'dotnet publish --configuration Release --output ../dist'
+          skip_api_build: true # We use linked Azure Functions for API
+  close_pull_request:
+    if: github.event_name == 'pull_request' && github.event.action == 'closed'
+    runs-on: ubuntu-latest
+    name: Close Pull Request Job
+    steps:
+      - name: Close Pull Request
+        id: closepullrequest
+        uses: Azure/static-web-apps-deploy@v1
+        with:
+          azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
+          action: "close"
+          app_location: "/Client"

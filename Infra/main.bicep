@@ -25,6 +25,7 @@ var uniqueSuffix = substring(uniqueString(resourceGroup().id), 0, 8)
 var functionAppName = '${baseName}-func-${environment}-${uniqueSuffix}'
 var storageAccountName = '${baseName}st${environment}${uniqueSuffix}'
 var keyVaultName = '${baseName}-kv-${environment}-${uniqueSuffix}'
+var staticWebAppName = '${baseName}-swa-${environment}-${uniqueSuffix}'
 
 // Storage Account
 resource storage 'Microsoft.Storage/storageAccounts@2023-01-01' = {
@@ -199,6 +200,7 @@ resource keepAliveAlert 'Microsoft.Insights/metricAlerts@2018-03-01' = {
           operator: 'LessThan'
           threshold: 80
           timeAggregation: 'Average'
+          criterionType: 'StaticThresholdCriterion'
         }
       ]
     }
@@ -230,3 +232,40 @@ resource kvAccess 'Microsoft.KeyVault/vaults/accessPolicies@2023-02-01' = {
 output functionAppName string = functionApp.name
 output storageAccountName string = storage.name
 output keyVaultName string = keyVault.name
+
+// Azure Static Web Apps
+resource staticWebApp 'Microsoft.Web/staticSites@2023-01-01' = {
+  name: staticWebAppName
+  location: 'Central US' // Static Web Apps has limited region availability
+  sku: {
+    name: 'Free'
+    tier: 'Free'
+  }
+  properties: {
+    repositoryUrl: '' // Will be configured during GitHub integration
+    branch: 'main'
+    buildProperties: {
+      appLocation: '/Client'
+      apiLocation: '' // We'll link to existing Azure Functions
+      outputLocation: 'wwwroot'
+    }
+    allowConfigFileUpdates: true
+    stagingEnvironmentPolicy: 'Enabled'
+  }
+  tags: {
+    environment: 'production'
+  }
+}
+
+// Link Static Web Apps to existing Azure Functions for API
+resource staticWebAppApiLink 'Microsoft.Web/staticSites/linkedBackends@2023-01-01' = {
+  name: 'azure-functions-backend'
+  parent: staticWebApp
+  properties: {
+    backendResourceId: functionApp.id
+    region: location
+  }
+}
+
+output staticWebAppName string = staticWebApp.name
+output staticWebAppUrl string = staticWebApp.properties.defaultHostname

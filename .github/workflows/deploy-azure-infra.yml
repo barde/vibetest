@@ -40,18 +40,41 @@ jobs:
             az group create --name ${{ steps.random.outputs.base_name }} --location westeurope
 
       - name: Deploy Bicep
+        id: bicep-deploy
         uses: azure/arm-deploy@v1
         with:
+          scope: resourcegroup
           subscriptionId: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
           resourceGroupName: ${{ steps.random.outputs.base_name }}
           template: Infra/main.bicep
           parameters: >
-            functionAppName=${{ steps.random.outputs.base_name }} storageAccountName=${{ steps.random.outputs.base_name }} keyVaultName=${{ steps.random.outputs.base_name }}
+            baseName=${{ steps.random.outputs.base_name }}
           failOnStdErr: false
+
+      - name: Get Static Web Apps deployment token
+        id: swa-token
+        uses: azure/cli@v2
+        with:
+          azcliversion: latest
+          inlineScript: |
+            SWA_NAME="${{ steps.bicep-deploy.outputs.staticWebAppName }}"
+            SWA_TOKEN=$(az staticwebapp secrets list --name "$SWA_NAME" --resource-group "${{ steps.random.outputs.base_name }}" --query "properties.apiKey" --output tsv)
+            echo "::add-mask::$SWA_TOKEN"
+            echo "token=$SWA_TOKEN" >> $GITHUB_OUTPUT
 
       - name: Output resource names
         run: |
           echo "Resource Group: ${{ steps.random.outputs.base_name }}"
-          echo "Function App Name: ${{ steps.random.outputs.base_name }}"
-          echo "Storage Account Name: ${{ steps.random.outputs.base_name }}"
-          echo "Key Vault Name: ${{ steps.random.outputs.base_name }}"
+          echo "Function App Name: ${{ steps.bicep-deploy.outputs.functionAppName }}"
+          echo "Storage Account Name: ${{ steps.bicep-deploy.outputs.storageAccountName }}"
+          echo "Key Vault Name: ${{ steps.bicep-deploy.outputs.keyVaultName }}"
+          echo "Static Web App Name: ${{ steps.bicep-deploy.outputs.staticWebAppName }}"
+          echo "Static Web App URL: https://${{ steps.bicep-deploy.outputs.staticWebAppUrl }}"
+          echo ""
+          echo "🚀 Next steps:"
+          echo "1. Set the AZURE_STATIC_WEB_APPS_API_TOKEN secret in your repository:"
+          echo "   - Go to Settings > Secrets and variables > Actions"
+          echo "   - Add secret: AZURE_STATIC_WEB_APPS_API_TOKEN"
+          echo "   - Value: ${{ steps.swa-token.outputs.token }}"
+          echo "2. Update AZURE_BASE_NAME secret to: ${{ steps.random.outputs.base_name }}"
+          echo "3. Deploy your Blazor app using the 'Deploy Blazor to Azure Static Web Apps' workflow"
