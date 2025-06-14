@@ -15,3 +15,4 @@ after pushing changes to the main branch, the GitHub Actions workflows will auto
 Check for successful runs and also check the used resources in azure for correct configuration.
 Lint all infrastructure code and use only bicep for infrastructure as code.
 Lint and test the infrastructure before deploying.
+When searching the web for solutions, prefer official documentation and trusted sources. The current year is 2025 if you need to know it.

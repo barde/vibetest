@@ -1,10 +1,32 @@
 # Deploy Azure Infrastructure with Bicep
-# This workflow runs the Bicep deployment on request (workflow_dispatch)
+# This workflow runs the Bicep deployment following Azure CAF naming conventions
+# Uses predictable, environment-based naming instead of random suffixes
 
 name: Deploy Azure Infra (Bicep)
 
 on:
   workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Deployment environment'
+        required: true
+        default: 'prod'
+        type: choice
+        options:
+        - dev
+        - test
+        - prod
+      location:
+        description: 'Azure region'
+        required: true
+        default: 'westeurope'
+        type: choice
+        options:
+        - westeurope
+        - eastus
+        - westus2
+        - centralus
+        - northeurope
   push:
     branches: [ master, main ]
     paths:
@@ -18,6 +40,12 @@ permissions:
 jobs:
   deploy-infra:
     runs-on: ubuntu-latest
+    env:
+      # Azure CAF naming convention: rg-{workload}-{environment}-{region}
+      WORKLOAD_NAME: cpltst
+      ENVIRONMENT: ${{ github.event.inputs.environment || 'prod' }}
+      LOCATION: ${{ github.event.inputs.location || 'westeurope' }}
+      INSTANCE: '001'
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -29,20 +57,47 @@ jobs:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
-      - name: Generate random suffix
-        id: random
+      - name: Set Azure CAF naming variables
+        id: naming
         run: |
-          $RANDOM_SUFFIX = -join ((48..57) + (97..122) | Get-Random -Count 8 | % {[char]$_})
-          $BASE_NAME = "copilotblazor$RANDOM_SUFFIX"
-          echo "base_name=$BASE_NAME" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
-        shell: pwsh
+          # Azure CAF naming conventions
+          # Resource Group: rg-{workload}-{environment}-{region-abbr}
+          case "${{ env.LOCATION }}" in
+            "westeurope") REGION_ABBR="we" ;;
+            "eastus") REGION_ABBR="eus" ;;
+            "westus2") REGION_ABBR="wus2" ;;
+            "centralus") REGION_ABBR="cus" ;;
+            "northeurope") REGION_ABBR="ne" ;;
+            *) REGION_ABBR="unk" ;;
+          esac
+          
+          RG_NAME="rg-${{ env.WORKLOAD_NAME }}-${{ env.ENVIRONMENT }}-${REGION_ABBR}"
+          
+          echo "region_abbr=${REGION_ABBR}" >> $GITHUB_OUTPUT
+          echo "resource_group_name=${RG_NAME}" >> $GITHUB_OUTPUT
+          echo "base_name=${{ env.WORKLOAD_NAME }}" >> $GITHUB_OUTPUT
+          
+          echo "📋 Azure CAF Naming Convention Applied:"
+          echo "Resource Group: ${RG_NAME}"
+          echo "Base Name: ${{ env.WORKLOAD_NAME }}"
+          echo "Environment: ${{ env.ENVIRONMENT }}"
+          echo "Location: ${{ env.LOCATION }} (${REGION_ABBR})"
+          echo "Instance: ${{ env.INSTANCE }}"
 
       - name: Ensure Resource Group exists
         uses: azure/cli@v2
         with:
           azcliversion: latest
           inlineScript: |
-            az group create --name ${{ steps.random.outputs.base_name }} --location westeurope
+            az group create \
+              --name ${{ steps.naming.outputs.resource_group_name }} \
+              --location ${{ env.LOCATION }} \
+              --tags \
+                Environment=${{ env.ENVIRONMENT }} \
+                Workload=${{ env.WORKLOAD_NAME }} \
+                ManagedBy="GitHub Actions" \
+                Repository="${{ github.repository }}" \
+                LastDeployed="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 
       - name: Deploy Bicep
         id: bicep-deploy
@@ -50,22 +105,33 @@ jobs:
         with:
           scope: resourcegroup
           subscriptionId: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-          resourceGroupName: ${{ steps.random.outputs.base_name }}
+          resourceGroupName: ${{ steps.naming.outputs.resource_group_name }}
           template: Infra/main.bicep
           parameters: >
-            baseName=${{ steps.random.outputs.base_name }}
+            baseName=${{ steps.naming.outputs.base_name }}
+            environment=${{ env.ENVIRONMENT }}
+            instance=${{ env.INSTANCE }}
+            location=${{ env.LOCATION }}
           failOnStdErr: false
 
-      - name: Output resource names
+      - name: Output resource names and next steps
         run: |
-          echo "Resource Group: ${{ steps.random.outputs.base_name }}"
-          echo "Function App Name: ${{ steps.bicep-deploy.outputs.functionAppName }}"
-          echo "Storage Account Name: ${{ steps.bicep-deploy.outputs.storageAccountName }}"
-          echo "Key Vault Name: ${{ steps.bicep-deploy.outputs.keyVaultName }}"
-          echo "Static Web App Name: ${{ steps.bicep-deploy.outputs.staticWebAppName }}"
+          echo "🎯 Azure CAF Deployment Complete!"
+          echo "=================================="
+          echo "Resource Group: ${{ steps.naming.outputs.resource_group_name }}"
+          echo "Environment: ${{ env.ENVIRONMENT }}"
+          echo "Location: ${{ env.LOCATION }}"
+          echo ""
+          echo "📦 Deployed Resources:"
+          echo "Function App: ${{ steps.bicep-deploy.outputs.functionAppName }}"
+          echo "Storage Account: ${{ steps.bicep-deploy.outputs.storageAccountName }}"
+          echo "Key Vault: ${{ steps.bicep-deploy.outputs.keyVaultName }}"
+          echo "Static Web App: ${{ steps.bicep-deploy.outputs.staticWebAppName }}"
           echo "Static Web App URL: https://${{ steps.bicep-deploy.outputs.staticWebAppUrl }}"
           echo ""
-          echo "🚀 Next steps:"
-          echo "1. Update AZURE_BASE_NAME secret to: ${{ steps.random.outputs.base_name }}"
+          echo "🚀 Next Steps:"
+          echo "1. Update AZURE_BASE_NAME secret to: ${{ steps.naming.outputs.resource_group_name }}"
           echo "2. Deploy your Blazor app using the 'Deploy Blazor to Azure Static Web Apps' workflow"
           echo "3. The workflow will automatically retrieve the deployment token from Azure"
+          echo ""
+          echo "💡 Resource names follow Azure CAF naming conventions for consistency and manageability"
