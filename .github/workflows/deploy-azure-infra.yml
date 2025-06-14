@@ -1,6 +1,5 @@
 # Deploy Azure Infrastructure with Bicep
-# This workflow runs the Bicep deployment following Azure CAF naming conventions
-# Uses predictable, environment-based naming instead of random suffixes
+# Simplified deployment for West Europe region
 
 name: Deploy Azure Infra (Bicep)
 
@@ -16,17 +15,6 @@ on:
         - dev
         - test
         - prod
-      location:
-        description: 'Azure region'
-        required: true
-        default: 'westeurope'
-        type: choice
-        options:
-        - westeurope
-        - eastus
-        - westus2
-        - centralus
-        - northeurope
   push:
     branches: [ master, main ]
     paths:
@@ -41,11 +29,10 @@ jobs:
   deploy-infra:
     runs-on: ubuntu-latest
     env:
-      # Azure CAF naming convention: rg-{workload}-{environment}-{region}
+      # Simplified naming convention
       WORKLOAD_NAME: cpltst
       ENVIRONMENT: ${{ github.event.inputs.environment || 'prod' }}
-      LOCATION: ${{ github.event.inputs.location || 'westeurope' }}
-      INSTANCE: '001'
+      LOCATION: westeurope  # Fixed to West Europe
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -57,32 +44,19 @@ jobs:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
-      - name: Set Azure CAF naming variables
+      - name: Set naming variables
         id: naming
         run: |
-          # Azure CAF naming conventions
-          # Resource Group: rg-{workload}-{environment}-{region-abbr}
-          case "${{ env.LOCATION }}" in
-            "westeurope") REGION_ABBR="we" ;;
-            "eastus") REGION_ABBR="eus" ;;
-            "westus2") REGION_ABBR="wus2" ;;
-            "centralus") REGION_ABBR="cus" ;;
-            "northeurope") REGION_ABBR="ne" ;;
-            *) REGION_ABBR="unk" ;;
-          esac
+          # Simplified naming convention: rg-{workload}-{environment}
+          RG_NAME="rg-${{ env.WORKLOAD_NAME }}-${{ env.ENVIRONMENT }}"
           
-          RG_NAME="rg-${{ env.WORKLOAD_NAME }}-${{ env.ENVIRONMENT }}-${REGION_ABBR}"
-          
-          echo "region_abbr=${REGION_ABBR}" >> $GITHUB_OUTPUT
           echo "resource_group_name=${RG_NAME}" >> $GITHUB_OUTPUT
-          echo "base_name=${{ env.WORKLOAD_NAME }}" >> $GITHUB_OUTPUT
-          
-          echo "📋 Azure CAF Naming Convention Applied:"
+          echo "workload_name=${{ env.WORKLOAD_NAME }}" >> $GITHUB_OUTPUT
+            echo "📋 Simplified Naming Convention Applied:"
           echo "Resource Group: ${RG_NAME}"
-          echo "Base Name: ${{ env.WORKLOAD_NAME }}"
+          echo "Workload: ${{ env.WORKLOAD_NAME }}"
           echo "Environment: ${{ env.ENVIRONMENT }}"
-          echo "Location: ${{ env.LOCATION }} (${REGION_ABBR})"
-          echo "Instance: ${{ env.INSTANCE }}"
+          echo "Location: ${{ env.LOCATION }} (Fixed)"
 
       - name: Ensure Resource Group exists
         uses: azure/cli@v2
@@ -108,16 +82,14 @@ jobs:
           resourceGroupName: ${{ steps.naming.outputs.resource_group_name }}
           template: Infra/main.bicep
           parameters: >
-            baseName=${{ steps.naming.outputs.base_name }}
+            workloadName=${{ steps.naming.outputs.workload_name }}
             environment=${{ env.ENVIRONMENT }}
-            instance=${{ env.INSTANCE }}
-            location=${{ env.LOCATION }}
           failOnStdErr: false
 
       - name: Output resource names and next steps
         run: |
-          echo "🎯 Azure CAF Deployment Complete!"
-          echo "=================================="
+          echo "🎯 Simplified Azure Deployment Complete!"
+          echo "====================================="
           echo "Resource Group: ${{ steps.naming.outputs.resource_group_name }}"
           echo "Environment: ${{ env.ENVIRONMENT }}"
           echo "Location: ${{ env.LOCATION }}"
@@ -130,8 +102,7 @@ jobs:
           echo "Static Web App URL: https://${{ steps.bicep-deploy.outputs.staticWebAppUrl }}"
           echo ""
           echo "🚀 Next Steps:"
-          echo "1. Update AZURE_BASE_NAME secret to: ${{ steps.naming.outputs.resource_group_name }}"
-          echo "2. Deploy your Blazor app using the 'Deploy Blazor to Azure Static Web Apps' workflow"
-          echo "3. The workflow will automatically retrieve the deployment token from Azure"
+          echo "1. Deploy your Blazor app using the 'Deploy Blazor to Azure Static Web Apps' workflow"
+          echo "2. The workflow will automatically retrieve the deployment token from Azure"
           echo ""
-          echo "💡 Resource names follow Azure CAF naming conventions for consistency and manageability"
+          echo "💡 Simplified resource naming for easier management"

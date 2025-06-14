@@ -1,38 +1,31 @@
 // main.bicep
 // Deploys an Azure Function App, Storage Account, and Key Vault with best practices
-// Following Azure CAF naming conventions: <resource-type>-<workload>-<environment>-<instance>
+// Simplified naming convention for West Europe deployment
 
-param location string = resourceGroup().location
+@description('The workload name identifier')
 @minLength(3)
-@maxLength(12) // Ensure storage account name stays within 24 char limit: st(2) + baseName(12) + environment(4) + locationAbbr(4) + instance(3) = 25, need to optimize
-param baseName string = 'cpltst' // Shortened to fit naming constraints
+@maxLength(8)
+param workloadName string = 'cpltst'
+
+@description('The deployment environment')
 @allowed(['dev', 'test', 'prod'])
 param environment string = 'prod'
-param skuName string = 'Y1' // Consumption plan for Functions
-@minLength(3)
-@maxLength(3)
-param instance string = '001' // Instance identifier for resource naming
 
-// Location abbreviation mapping for consistent naming
-var locationAbbreviations = {
-  westeurope: 'we'
-  eastus: 'eus'
-  westus2: 'wus2'
-  centralus: 'cus'
-  northeurope: 'ne'
-  southcentralus: 'scus'
-}
-var locationAbbr = locationAbbreviations[?location] ?? 'unk'
+@description('The SKU name for the Function App service plan')
+param functionAppSku string = 'Y1' // Consumption plan for Functions
 
-// Azure CAF compliant resource names
-var functionAppName = 'func-${baseName}-${environment}-${locationAbbr}-${instance}'
-var storageAccountName = 'st${baseName}${environment}${locationAbbr}${instance}' // Storage: no hyphens, 3-24 chars
-var keyVaultName = 'kv-${baseName}-${locationAbbr}${instance}' // Key Vault: 3-24 chars, simplified for length
-var staticWebAppName = 'swa-${baseName}-${environment}-${locationAbbr}-${instance}'
+// Fixed location: West Europe
+var location = 'westeurope'
+
+// Simplified Azure CAF compliant resource names (no location abbreviation or instance)
+var functionAppName = 'func-${workloadName}-${environment}'
+var storageAccountName = 'st${workloadName}${environment}' // Storage: no hyphens, 3-24 chars
+var keyVaultName = 'kv-${workloadName}-${environment}' // Key Vault: 3-24 chars
+var staticWebAppName = 'swa-${workloadName}-${environment}'
 
 // Application Insights
 resource appInsights 'Microsoft.Insights/components@2020-02-02' = {
-  name: 'appi-${baseName}-${environment}-${locationAbbr}-${instance}'
+  name: 'appi-${workloadName}-${environment}'
   location: location
   kind: 'web'
   properties: {
@@ -41,7 +34,7 @@ resource appInsights 'Microsoft.Insights/components@2020-02-02' = {
     WorkspaceResourceId: ''
   }
   tags: {
-    environment: 'production'
+    environment: environment
   }
 }
 
@@ -92,19 +85,18 @@ resource keyVault 'Microsoft.KeyVault/vaults@2023-02-01' = {
     networkAcls: {
       bypass: 'AzureServices'
       defaultAction: 'Allow'
-    }
-  }
+    }  }
   tags: {
-    environment: 'production'
+    environment: environment
   }
 }
 
 // App Service Plan for Function
 resource plan 'Microsoft.Web/serverfarms@2023-01-01' = {
-  name: 'asp-${baseName}-${environment}-${locationAbbr}-${instance}'
+  name: 'asp-${workloadName}-${environment}'
   location: location
   sku: {
-    name: skuName
+    name: functionAppSku
     tier: 'Dynamic'
   }
   kind: 'functionapp'
@@ -149,8 +141,7 @@ resource functionApp 'Microsoft.Web/sites@2023-01-01' = {
         {
           name: 'ApplicationInsightsAgent_EXTENSION_VERSION'
           value: '~3'
-        }
-      ]
+        }      ]
       ftpsState: 'Disabled'
       minTlsVersion: '1.2'
     }
@@ -158,7 +149,7 @@ resource functionApp 'Microsoft.Web/sites@2023-01-01' = {
     // AlwaysOn is not set (Consumption plan does not support it)
   }
   tags: {
-    environment: 'production'
+    environment: environment
   }
 }
 // Keep-alive availability test to prevent cold starts
@@ -192,7 +183,7 @@ resource keepAliveTest 'Microsoft.Insights/webtests@2022-06-15' = {
   }
   tags: {
     'hidden-link:${appInsights.id}': 'Resource'
-    environment: 'production'
+    environment: environment
   }
 }
 
@@ -224,7 +215,7 @@ resource keepAliveAlert 'Microsoft.Insights/metricAlerts@2018-03-01' = {
     }
   }
   tags: {
-    environment: 'production'
+    environment: environment
   }
 }
 
@@ -252,6 +243,7 @@ output storageAccountName string = storage.name
 output keyVaultName string = keyVault.name
 
 // Azure Static Web Apps
+// Azure Static Web Apps
 resource staticWebApp 'Microsoft.Web/staticSites@2023-01-01' = {
   name: staticWebAppName
   location: 'Central US' // Static Web Apps has limited region availability
@@ -271,7 +263,7 @@ resource staticWebApp 'Microsoft.Web/staticSites@2023-01-01' = {
     stagingEnvironmentPolicy: 'Enabled'
   }
   tags: {
-    environment: 'production'
+    environment: environment
   }
 }
 
