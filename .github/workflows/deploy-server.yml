@@ -31,14 +31,14 @@ on:
       - 'Server/**'
       - '.github/workflows/deploy-server.yml'
       - 'Server.Tests/**'
-      - 'CopilotBlazor.sln'
+      - 'Shared/**'
   pull_request:
     branches: [ master, main ]
     paths:
       - 'Server/**'
       - '.github/workflows/deploy-server.yml'
       - 'Server.Tests/**'
-      - 'CopilotBlazor.sln'
+      - 'Shared/**'
 
 permissions:
   id-token: write
@@ -82,32 +82,44 @@ jobs:
 
       - name: Restore dependencies
         run: |
-          echo "🔄 Restoring NuGet packages..."
-          dotnet restore CopilotBlazor.sln --verbosity minimal
-          echo "✅ Dependencies restored successfully"
+          echo "[sync] Restoring NuGet packages for Server projects..."
+          dotnet restore Server/Server.csproj --verbosity minimal
+          dotnet restore Server.Tests/Server.Tests.csproj --verbosity minimal
+          dotnet restore Shared/Shared.csproj --verbosity minimal
+          echo "[success] Dependencies restored successfully"
 
       - name: Build solution
         run: |
-          echo "🏗️ Building Azure Functions solution..."
-          dotnet build CopilotBlazor.sln \
+          echo "[build] Building Azure Functions and dependencies..."
+          dotnet build Shared/Shared.csproj \
             --configuration Release \
             --no-restore \
             --verbosity minimal \
             -p:TreatWarningsAsErrors=true
-          echo "✅ Build completed successfully"
+          dotnet build Server/Server.csproj \
+            --configuration Release \
+            --no-restore \
+            --verbosity minimal \
+            -p:TreatWarningsAsErrors=true
+          dotnet build Server.Tests/Server.Tests.csproj \
+            --configuration Release \
+            --no-restore \
+            --verbosity minimal \
+            -p:TreatWarningsAsErrors=true
+          echo "[success] Build completed successfully"
 
       - name: Run tests
         if: github.event.inputs.skip_tests != 'true'
         run: |
-          echo "🧪 Running server tests..."
-          dotnet test CopilotBlazor.sln \
+          echo "[test] Running server tests..."
+          dotnet test Server.Tests/Server.Tests.csproj \
             --configuration Release \
             --no-build \
             --verbosity normal \
             --logger trx \
             --results-directory ./test-results \
             --collect:"XPlat Code Coverage"
-          echo "✅ Tests completed successfully"
+          echo "[success] Tests completed successfully"
 
       - name: Upload test results
         if: always() && github.event.inputs.skip_tests != 'true'
@@ -119,13 +131,13 @@ jobs:
 
       - name: Publish Azure Functions app
         run: |
-          echo "📦 Publishing Azure Functions application..."
+          echo "[package] Publishing Azure Functions application..."
           dotnet publish Server/Server.csproj \
             --configuration Release \
             --no-build \
             --output ./publish \
             -p:PublishProfile=FolderProfile
-          echo "✅ Application published successfully"
+          echo "[success] Application published successfully"
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
@@ -142,6 +154,7 @@ jobs:
           
           echo "artifact-name=$ARTIFACT_NAME" >> $GITHUB_OUTPUT
           echo "build-version=$BUILD_VERSION" >> $GITHUB_OUTPUT
+
   # Deploy to Azure Functions
   deploy-to-azure:
     name: Deploy to Azure Functions
@@ -175,7 +188,7 @@ jobs:
           FUNC_APP_NAME="func-${{ env.WORKLOAD_NAME }}-${{ env.ENVIRONMENT }}"
           RG_NAME="rg-${{ env.WORKLOAD_NAME }}-${{ env.ENVIRONMENT }}"
           
-          echo "🔍 Verifying Function App: $FUNC_APP_NAME"
+          echo "[search] Verifying Function App: $FUNC_APP_NAME"
           
           if ! az functionapp show --name "$FUNC_APP_NAME" --resource-group "$RG_NAME" &>/dev/null; then
             echo "::error::Function App '$FUNC_APP_NAME' not found in resource group '$RG_NAME'."
@@ -183,7 +196,7 @@ jobs:
             exit 1
           fi
           
-          echo "✅ Function App exists and is ready for deployment"
+          echo "[success] Function App exists and is ready for deployment"
           echo "app-name=$FUNC_APP_NAME" >> $GITHUB_OUTPUT
 
       - name: Deploy to Azure Functions
@@ -201,7 +214,7 @@ jobs:
         run: |
           FUNC_APP_NAME="${{ steps.verify-app.outputs.app-name }}"
           
-          echo "🔍 Verifying deployment health..."
+          echo "[search] Verifying deployment health..."
           
           # Get the function app URL
           FUNC_URL=$(az functionapp show \
@@ -211,24 +224,24 @@ jobs:
             --output tsv)
           
           if [ -n "$FUNC_URL" ]; then
-            echo "🌐 Function App URL: https://$FUNC_URL"
+            echo "[web] Function App URL: https://$FUNC_URL"
             
             # Test health endpoint if available
             if curl -f -s "https://$FUNC_URL/api/health" >/dev/null 2>&1; then
-              echo "✅ Health check passed"
+              echo "[success] Health check passed"
             else
-              echo "⚠️ Health endpoint not available or not responding (this may be normal)"
+              echo "[warning] Health endpoint not available or not responding (this may be normal)"
             fi
           else
-            echo "⚠️ Could not retrieve Function App URL"
+            echo "[warning] Could not retrieve Function App URL"
           fi
           
-          echo "✅ Deployment verification complete"
+          echo "[success] Deployment verification complete"
 
       - name: Output deployment summary
         if: always()
         run: |
-          echo "## ⚡ Azure Functions Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "## [lightning] Azure Functions Deployment Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "| Property | Value |" >> $GITHUB_STEP_SUMMARY
           echo "|----------|-------|" >> $GITHUB_STEP_SUMMARY
@@ -240,7 +253,7 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           
           if [[ "${{ job.status }}" == "success" ]]; then
-            echo "### ✅ Deployment Status: SUCCESS" >> $GITHUB_STEP_SUMMARY
+            echo "### [success] Deployment Status: SUCCESS" >> $GITHUB_STEP_SUMMARY
             
             # Get the Function App URL
             FUNC_URL=$(az functionapp show \
@@ -254,20 +267,20 @@ jobs:
               echo "- **Health Endpoint**: https://$FUNC_URL/api/health" >> $GITHUB_STEP_SUMMARY
             fi
           else
-            echo "### ❌ Deployment Status: FAILED" >> $GITHUB_STEP_SUMMARY
+            echo "### [error] Deployment Status: FAILED" >> $GITHUB_STEP_SUMMARY
             echo "Please check the logs for more details." >> $GITHUB_STEP_SUMMARY
           fi
 
       - name: Clean up on failure
         if: failure() && github.event.inputs.environment != 'prod'
         run: |
-          echo "🧹 Cleaning up failed deployment for non-production environment..."
+          echo "[cleanup] Cleaning up failed deployment for non-production environment..."
           FUNC_APP_NAME="${{ steps.verify-app.outputs.app-name }}"
           
           if [ -n "$FUNC_APP_NAME" ]; then
             echo "Restarting Function App to recover from failed deployment..."
             az functionapp restart --name "$FUNC_APP_NAME" --resource-group "rg-${{ env.WORKLOAD_NAME }}-${{ env.ENVIRONMENT }}" || true
-            echo "✅ Cleanup completed"
+            echo "[success] Cleanup completed"
           else
-            echo "ℹ️ No cleanup needed"
+            echo "[info] No cleanup needed"
           fi
