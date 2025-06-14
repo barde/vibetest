@@ -21,7 +21,6 @@ var location = 'westeurope'
 var functionAppName = 'func-${workloadName}-${environment}'
 var storageAccountName = 'st${workloadName}${environment}' // Storage: no hyphens, 3-24 chars
 var keyVaultName = 'kv-${workloadName}-${environment}' // Key Vault: 3-24 chars
-var staticWebAppName = 'swa-${workloadName}-${environment}'
 
 // Application Insights
 resource appInsights 'Microsoft.Insights/components@2020-02-02' = {
@@ -112,11 +111,9 @@ resource functionApp 'Microsoft.Web/sites@2023-01-01' = {
   }
   properties: {
     serverFarmId: plan.id
-    siteConfig: {
-      appSettings: [
-        {
+    siteConfig: {      appSettings: [        {
           name: 'AzureWebJobsStorage'
-          value: storage.properties.primaryEndpoints.blob
+          value: 'DefaultEndpointsProtocol=https;AccountName=${storage.name};EndpointSuffix=${az.environment().suffixes.storage};AccountKey=${storage.listKeys().keys[0].value}'
         }
         {
           name: 'FUNCTIONS_EXTENSION_VERSION'
@@ -241,41 +238,3 @@ resource kvAccess 'Microsoft.KeyVault/vaults/accessPolicies@2023-02-01' = {
 output functionAppName string = functionApp.name
 output storageAccountName string = storage.name
 output keyVaultName string = keyVault.name
-
-// Azure Static Web Apps
-// Azure Static Web Apps
-resource staticWebApp 'Microsoft.Web/staticSites@2023-01-01' = {
-  name: staticWebAppName
-  location: 'Central US' // Static Web Apps has limited region availability
-  sku: {
-    name: 'Free'
-    tier: 'Free'
-  }
-  properties: {
-    repositoryUrl: 'https://github.com/barde/vibetest' // Set actual repository URL
-    branch: 'master' // Use master instead of main
-    buildProperties: {
-      appLocation: '/Client'
-      apiLocation: '' // We'll link to existing Azure Functions
-      outputLocation: 'wwwroot'
-    }
-    allowConfigFileUpdates: true
-    stagingEnvironmentPolicy: 'Enabled'
-  }
-  tags: {
-    environment: environment
-  }
-}
-
-// Link Static Web Apps to Azure Functions for integrated API
-resource staticWebAppApiLink 'Microsoft.Web/staticSites/linkedBackends@2023-01-01' = {
-  name: 'azure-functions-backend'
-  parent: staticWebApp
-  properties: {
-    backendResourceId: functionApp.id
-    region: location
-  }
-}
-
-output staticWebAppName string = staticWebApp.name
-output staticWebAppUrl string = staticWebApp.properties.defaultHostname
