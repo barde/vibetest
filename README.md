@@ -40,17 +40,8 @@ Uses **GitHub Actions with OIDC** for secure, keyless deployment - no long-lived
 
 ### Setup (One-time)
 
-1. **Azure Setup**: Create service principal with federated identity credentials for GitHub
-   - 📚 **Guide**: [Configuring OpenID Connect in Azure](https://docs.microsoft.com/en-us/azure/developer/github/connect-from-azure)
-
-2. **GitHub Repository Secrets** (OIDC configuration):
-   ```
-   AZURE_CLIENT_ID        # Service principal application (client) ID
-   AZURE_TENANT_ID        # Azure Active Directory tenant ID  
-   AZURE_SUBSCRIPTION_ID  # Target Azure subscription ID
-   ```
-   
-   > 💡 **Note**: These are configuration identifiers, not authentication secrets. OIDC uses short-lived tokens automatically exchanged by GitHub Actions.
+**Azure Setup**: Create service principal with federated identity credentials for GitHub
+- 📚 **Guide**: [Configuring OpenID Connect in Azure](https://docs.microsoft.com/en-us/azure/developer/github/connect-from-azure)
 
 ### Deploy
 
