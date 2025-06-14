@@ -12,26 +12,80 @@ on:
         default: 'prod'
         type: choice
         options:
-        - dev
-        - test
-        - prod
+          - dev
+          - test
+          - prod
+      force_recreate:
+        description: 'Force recreate resources (use Complete deployment mode)'
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   id-token: write
   contents: read
+  actions: read
 
 env:
   WORKLOAD_NAME: cpltst
   ENVIRONMENT: ${{ github.event.inputs.environment || 'prod' }}
   LOCATION: westeurope
+  AZURE_CLI_VERSION: '2.53.0'
 
 jobs:
-  deploy-infrastructure:
-    name: Deploy Azure Infrastructure
+  validate:
+    name: Validate Infrastructure
     runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment || 'prod' }}
+    outputs:
+      resource-group-name: ${{ steps.set-outputs.outputs.resource-group-name }}
+      deployment-name: ${{ steps.set-outputs.outputs.deployment-name }}
+    
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Set up Azure CLI
+        uses: azure/CLI@v1
+        with:
+          azcliversion: ${{ env.AZURE_CLI_VERSION }}
+
+      - name: Azure Login via OIDC
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Validate Bicep template
+        run: |
+          echo "🔍 Validating Bicep template..."
+          az bicep build --file Infra/main.bicep
+          echo "✅ Bicep template is valid"
+
+      - name: Set job outputs
+        id: set-outputs
+        run: |
+          RG_NAME="rg-${{ env.WORKLOAD_NAME }}-${{ env.ENVIRONMENT }}"
+          DEPLOYMENT_NAME="deploy-${{ github.run_number }}-$(date +%Y%m%d-%H%M%S)"
+          
+          echo "resource-group-name=$RG_NAME" >> $GITHUB_OUTPUT
+          echo "deployment-name=$DEPLOYMENT_NAME" >> $GITHUB_OUTPUT
+
+  deploy-infrastructure:
+    name: Deploy Azure Infrastructure
+    runs-on: ubuntu-latest
+    needs: validate
+    environment: ${{ github.event.inputs.environment || 'prod' }}
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Azure CLI
+        uses: azure/CLI@v1
+        with:
+          azcliversion: ${{ env.AZURE_CLI_VERSION }}
 
       - name: Azure Login via OIDC
         uses: azure/login@v2
@@ -42,45 +96,104 @@ jobs:
 
       - name: Create Resource Group
         run: |
-          RG_NAME="rg-${{ env.WORKLOAD_NAME }}-${{ env.ENVIRONMENT }}"
+          RG_NAME="${{ needs.validate.outputs.resource-group-name }}"
           
+          echo "🏗️ Creating resource group: $RG_NAME"
           az group create \
             --name "$RG_NAME" \
-            --location ${{ env.LOCATION }} \            --tags \
-              Environment=${{ env.ENVIRONMENT }} \
-              Workload=${{ env.WORKLOAD_NAME }} \
+            --location "${{ env.LOCATION }}" \
+            --tags \
+              Environment="${{ env.ENVIRONMENT }}" \
+              Workload="${{ env.WORKLOAD_NAME }}" \
               ManagedBy="GitHub Actions" \
               Repository="${{ github.repository }}" \
+              RunId="${{ github.run_id }}" \
+              RunNumber="${{ github.run_number }}" \
               LastDeployed="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          
+          echo "✅ Resource group created successfully"
 
       - name: Deploy Bicep Template
         id: deploy
-        timeout-minutes: 15
-        uses: azure/arm-deploy@v1
+        timeout-minutes: 30
+        uses: azure/arm-deploy@v2
         with:
           scope: resourcegroup
           subscriptionId: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-          resourceGroupName: rg-${{ env.WORKLOAD_NAME }}-${{ env.ENVIRONMENT }}
+          resourceGroupName: ${{ needs.validate.outputs.resource-group-name }}
           template: Infra/main.bicep
-          deploymentMode: Incremental
+          deploymentName: ${{ needs.validate.outputs.deployment-name }}
+          deploymentMode: ${{ github.event.inputs.force_recreate == 'true' && 'Complete' || 'Incremental' }}
           parameters: >
             workloadName=${{ env.WORKLOAD_NAME }}
             environment=${{ env.ENVIRONMENT }}
-          failOnStdErr: true
+            location=${{ env.LOCATION }}
+          failOnStdErr: false
+
+      - name: Verify deployment
+        if: success()
+        run: |
+          echo "🔍 Verifying deployment status..."
+          az deployment group show \
+            --resource-group "${{ needs.validate.outputs.resource-group-name }}" \
+            --name "${{ needs.validate.outputs.deployment-name }}" \
+            --query "properties.provisioningState" \
+            --output tsv
+          
+          echo "✅ Deployment verification complete"
 
       - name: Output deployment summary
+        if: always()
         run: |
-          echo "🎯 Azure Deployment Complete!"
-          echo "========================="
-          echo "Resource Group: rg-${{ env.WORKLOAD_NAME }}-${{ env.ENVIRONMENT }}"
-          echo "Environment: ${{ env.ENVIRONMENT }}"
-          echo "Location: ${{ env.LOCATION }}"
-          echo ""
-          echo "📦 Deployed Resources:"
-          echo "Function App: ${{ steps.deploy.outputs.functionAppName }}"
-          echo "Storage Account: ${{ steps.deploy.outputs.storageAccountName }}"
-          echo "Key Vault: ${{ steps.deploy.outputs.keyVaultName }}"
-          echo "Static Web App: ${{ steps.deploy.outputs.staticWebAppName }}"
-          echo "Static Web App URL: https://${{ steps.deploy.outputs.staticWebAppUrl }}"
-          echo ""
-          echo "🔗 Note: Static Web App API linking is now enabled in the Bicep template."
+          echo "## 🎯 Azure Infrastructure Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Property | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|----------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Resource Group | \`${{ needs.validate.outputs.resource-group-name }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Environment | \`${{ env.ENVIRONMENT }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Location | \`${{ env.LOCATION }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Deployment Name | \`${{ needs.validate.outputs.deployment-name }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Deployment Mode | \`${{ github.event.inputs.force_recreate == 'true' && 'Complete' || 'Incremental' }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Run ID | \`${{ github.run_id }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [[ "${{ job.status }}" == "success" ]]; then
+            echo "### ✅ Deployment Status: SUCCESS" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "#### 📦 Deployed Resources:" >> $GITHUB_STEP_SUMMARY
+            
+            # Only output if the values exist
+            if [[ -n "${{ steps.deploy.outputs.functionAppName }}" ]]; then
+              echo "- **Function App**: \`${{ steps.deploy.outputs.functionAppName }}\`" >> $GITHUB_STEP_SUMMARY
+            fi
+            if [[ -n "${{ steps.deploy.outputs.storageAccountName }}" ]]; then
+              echo "- **Storage Account**: \`${{ steps.deploy.outputs.storageAccountName }}\`" >> $GITHUB_STEP_SUMMARY
+            fi
+            if [[ -n "${{ steps.deploy.outputs.keyVaultName }}" ]]; then
+              echo "- **Key Vault**: \`${{ steps.deploy.outputs.keyVaultName }}\`" >> $GITHUB_STEP_SUMMARY
+            fi
+            if [[ -n "${{ steps.deploy.outputs.staticWebAppName }}" ]]; then
+              echo "- **Static Web App**: \`${{ steps.deploy.outputs.staticWebAppName }}\`" >> $GITHUB_STEP_SUMMARY
+            fi
+            if [[ -n "${{ steps.deploy.outputs.staticWebAppUrl }}" ]]; then
+              echo "- **Static Web App URL**: https://${{ steps.deploy.outputs.staticWebAppUrl }}" >> $GITHUB_STEP_SUMMARY
+            fi
+          else
+            echo "### ❌ Deployment Status: FAILED" >> $GITHUB_STEP_SUMMARY
+            echo "Please check the logs for more details." >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Clean up on failure
+        if: failure() && github.event.inputs.environment != 'prod'
+        run: |
+          echo "🧹 Cleaning up failed deployment resources for non-production environment..."
+          RG_NAME="${{ needs.validate.outputs.resource-group-name }}"
+          
+          # Check if resource group exists before attempting deletion
+          if az group exists --name "$RG_NAME"; then
+            echo "Deleting resource group: $RG_NAME"
+            az group delete --name "$RG_NAME" --yes --no-wait
+            echo "✅ Cleanup initiated (running in background)"
+          else
+            echo "ℹ️ Resource group does not exist, no cleanup needed"
+          fi
