@@ -1,3 +1,6 @@
+# Deploy Azure Infrastructure with Bicep
+# This workflow deploys the required Azure resources for the application
+
 name: Deploy Azure Infrastructure
 
 on:
@@ -28,12 +31,14 @@ env:
   LOCATION: westeurope
 
 jobs:
-  deploy-infra:
+  deploy-infrastructure:
+    name: Deploy Azure Infrastructure
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-      - name: Azure Login
+      - name: Azure Login via OIDC
         uses: azure/login@v2
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}

@@ -1,8 +1,12 @@
+# Build, Test, and Deploy Azure Functions App
+# Step 1: Build and test on any branch push
+# Step 2: Deploy only on master branch
+
 name: Build and Deploy Azure Functions
 
 on:
   push:
-    branches: [ master, main ]
+    branches: [ '**' ]
     paths:
       - 'Server/**'
       - '.github/workflows/azure-functions-deploy.yml'
@@ -25,38 +29,55 @@ env:
   ENVIRONMENT: prod
 
 jobs:
-  test:
-    if: github.event_name == 'pull_request'
+  # Step 1: Build and test on all branch pushes
+  build-and-test:
+    name: Build and Test Azure Functions
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 9 SDK
+        uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '9.0.x'
-      - run: dotnet restore CopilotBlazor.sln
-      - run: dotnet build CopilotBlazor.sln --configuration Release --no-restore
-      - run: dotnet test CopilotBlazor.sln --verbosity normal
 
-  build-and-deploy:
+      - name: Restore dependencies
+        run: dotnet restore CopilotBlazor.sln
+
+      - name: Build solution
+        run: dotnet build CopilotBlazor.sln --configuration Release --no-restore
+
+      - name: Run tests
+        run: dotnet test CopilotBlazor.sln --verbosity normal
+
+      - name: Publish Azure Function (for validation)
+        run: dotnet publish Server/Server.csproj --configuration Release --output ./publish
+
+  # Step 2: Deploy only on master branch
+  deploy-to-azure:
+    name: Deploy to Azure Functions
     if: github.event_name == 'push' && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main')
     runs-on: windows-latest
+    needs: build-and-test
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-      - uses: actions/setup-dotnet@v4
+      - name: Setup .NET 9 SDK
+        uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '9.0.x'
 
-      - name: Build and test
+      - name: Restore and build solution
         run: |
           dotnet restore CopilotBlazor.sln
           dotnet build CopilotBlazor.sln --configuration Release --no-restore
-          dotnet test CopilotBlazor.sln --verbosity normal
 
-      - name: Publish Azure Function
+      - name: Publish Azure Function for deployment
         run: dotnet publish Server/Server.csproj --configuration Release --output ./publish
 
-      - name: Azure Login
+      - name: Azure Login via OIDC
         uses: azure/login@v2
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}

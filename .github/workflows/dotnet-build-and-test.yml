@@ -1,3 +1,6 @@
+# Build and test the solution on feature branches
+# This workflow runs on all branches except master/main to validate changes
+
 name: .NET Build and Test
 
 on:
@@ -6,13 +9,23 @@ on:
     branches-ignore: [ master, main ]
 
 jobs:
-  build:
+  build-and-test:
+    name: Build and Test Solution
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 9 SDK
+        uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '9.0.x'
-      - run: dotnet restore CopilotBlazor.sln
-      - run: dotnet build CopilotBlazor.sln --configuration Release --no-restore
-      - run: dotnet test CopilotBlazor.sln --verbosity normal
+
+      - name: Restore dependencies
+        run: dotnet restore CopilotBlazor.sln
+
+      - name: Build solution
+        run: dotnet build CopilotBlazor.sln --configuration Release --no-restore
+
+      - name: Run all tests
+        run: dotnet test CopilotBlazor.sln --verbosity normal
