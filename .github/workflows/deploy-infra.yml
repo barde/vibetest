@@ -51,8 +51,7 @@ jobs:
           
           az group create \
             --name "$RG_NAME" \
-            --location ${{ env.LOCATION }} \
-            --tags \
+            --location ${{ env.LOCATION }} \            --tags \
               Environment=${{ env.ENVIRONMENT }} \
               Workload=${{ env.WORKLOAD_NAME }} \
               ManagedBy="GitHub Actions" \
@@ -72,7 +71,7 @@ jobs:
           parameters: >
             workloadName=${{ env.WORKLOAD_NAME }}
             environment=${{ env.ENVIRONMENT }}
-          failOnStdErr: false
+          failOnStdErr: true
 
       - name: Output deployment summary
         run: |
