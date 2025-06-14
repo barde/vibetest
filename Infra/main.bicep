@@ -29,8 +29,12 @@ resource appInsights 'Microsoft.Insights/components@2020-02-02' = {
   kind: 'web'
   properties: {
     Application_Type: 'web'
-    Flow_Type: 'Redfield'
-    WorkspaceResourceId: ''
+    Flow_Type: 'Bluefield'
+    Request_Source: 'rest'
+    RetentionInDays: 90
+    DisableIpMasking: false
+    publicNetworkAccessForIngestion: 'Enabled'
+    publicNetworkAccessForQuery: 'Enabled'
   }
   tags: {
     environment: environment
