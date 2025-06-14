@@ -197,7 +197,7 @@ resource keepAliveAlert 'Microsoft.Insights/metricAlerts@2018-03-01' = {
     severity: 2
     enabled: true
     scopes: [
-      keepAliveTest.id
+      appInsights.id
     ]
     evaluationFrequency: 'PT1M'
     windowSize: 'PT5M'
@@ -211,6 +211,15 @@ resource keepAliveAlert 'Microsoft.Insights/metricAlerts@2018-03-01' = {
           threshold: 80
           timeAggregation: 'Average'
           criterionType: 'StaticThresholdCriterion'
+          dimensions: [
+            {
+              name: 'availabilityResult/name'
+              operator: 'Include'
+              values: [
+                '${functionAppName} Keep Alive Test'
+              ]
+            }
+          ]
         }
       ]
     }
