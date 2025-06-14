@@ -45,11 +45,6 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Azure CLI
-        uses: azure/CLI@v1
-        with:
-          azcliversion: ${{ env.AZURE_CLI_VERSION }}
-
       - name: Azure Login via OIDC
         uses: azure/login@v2
         with:
@@ -81,11 +76,6 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-
-      - name: Set up Azure CLI
-        uses: azure/CLI@v1
-        with:
-          azcliversion: ${{ env.AZURE_CLI_VERSION }}
 
       - name: Azure Login via OIDC
         uses: azure/login@v2
