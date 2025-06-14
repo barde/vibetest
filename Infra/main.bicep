@@ -1,17 +1,3 @@
-// Application Insights
-resource appInsights 'Microsoft.Insights/components@2020-02-02' = {
-  name: '${functionAppName}-ai'
-  location: location
-  kind: 'web'
-  properties: {
-    Application_Type: 'web'
-    Flow_Type: 'Redfield'
-    WorkspaceResourceId: ''
-  }
-  tags: {
-    environment: 'production'
-  }
-}
 // main.bicep
 // Deploys an Azure Function App, Storage Account, and Key Vault with best practices
 
@@ -26,6 +12,21 @@ var functionAppName = '${baseName}-func-${environment}-${uniqueSuffix}'
 var storageAccountName = '${baseName}st${environment}${uniqueSuffix}'
 var keyVaultName = '${baseName}-kv-${environment}-${uniqueSuffix}'
 var staticWebAppName = '${baseName}-swa-${environment}-${uniqueSuffix}'
+
+// Application Insights
+resource appInsights 'Microsoft.Insights/components@2020-02-02' = {
+  name: '${functionAppName}-ai'
+  location: location
+  kind: 'web'
+  properties: {
+    Application_Type: 'web'
+    Flow_Type: 'Redfield'
+    WorkspaceResourceId: ''
+  }
+  tags: {
+    environment: 'production'
+  }
+}
 
 // Storage Account
 resource storage 'Microsoft.Storage/storageAccounts@2023-01-01' = {
