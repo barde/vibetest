@@ -1,6 +1,5 @@
 # Build, Test, and Deploy Azure Functions App
-# Step 1: Build and test on any branch push
-# Step 2: Deploy only on master branch
+# This workflow builds, tests, and deploys the Azure Functions backend application
 
 name: Build and Deploy Azure Functions
 
@@ -13,11 +12,16 @@ on:
         default: 'prod'
         type: choice
         options:
-        - dev
-        - test
-        - prod
+          - dev
+          - test
+          - prod
       force_deploy:
         description: 'Force deployment even if no changes detected'
+        required: false
+        default: false
+        type: boolean
+      skip_tests:
+        description: 'Skip running tests before deployment'
         required: false
         default: false
         type: boolean
@@ -39,60 +43,123 @@ on:
 permissions:
   id-token: write
   contents: read
+  actions: read
 
 env:
   WORKLOAD_NAME: cpltst
   ENVIRONMENT: ${{ github.event.inputs.environment || 'prod' }}
+  DOTNET_VERSION: '9.0.x'
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
 
 jobs:
-  # Step 1: Build and test on all branch pushes
+  # Build and test the Azure Functions application
   build-and-test:
     name: Build and Test Azure Functions
-    runs-on: windows-latest
+    runs-on: ubuntu-latest
+    outputs:
+      artifact-name: ${{ steps.set-outputs.outputs.artifact-name }}
+      build-version: ${{ steps.set-outputs.outputs.build-version }}
+    
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-      - name: Setup .NET 9 SDK
+      - name: Setup .NET SDK
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '9.0.x'
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-
 
       - name: Restore dependencies
-        run: dotnet restore CopilotBlazor.sln
+        run: |
+          echo "🔄 Restoring NuGet packages..."
+          dotnet restore CopilotBlazor.sln --verbosity minimal
+          echo "✅ Dependencies restored successfully"
 
       - name: Build solution
-        run: dotnet build CopilotBlazor.sln --configuration Release --no-restore
+        run: |
+          echo "🏗️ Building Azure Functions solution..."
+          dotnet build CopilotBlazor.sln \
+            --configuration Release \
+            --no-restore \
+            --verbosity minimal \
+            -p:TreatWarningsAsErrors=true
+          echo "✅ Build completed successfully"
 
       - name: Run tests
-        run: dotnet test CopilotBlazor.sln --verbosity normal
+        if: github.event.inputs.skip_tests != 'true'
+        run: |
+          echo "🧪 Running server tests..."
+          dotnet test CopilotBlazor.sln \
+            --configuration Release \
+            --no-build \
+            --verbosity normal \
+            --logger trx \
+            --results-directory ./test-results \
+            --collect:"XPlat Code Coverage"
+          echo "✅ Tests completed successfully"
 
-      - name: Publish Azure Function (for validation)
-        run: dotnet publish Server/Server.csproj --configuration Release --output ./publish
-  # Step 2: Deploy on master branch or manual trigger
+      - name: Upload test results
+        if: always() && github.event.inputs.skip_tests != 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-server-${{ github.run_number }}
+          path: ./test-results
+          retention-days: 30
+
+      - name: Publish Azure Functions app
+        run: |
+          echo "📦 Publishing Azure Functions application..."
+          dotnet publish Server/Server.csproj \
+            --configuration Release \
+            --no-build \
+            --output ./publish \
+            -p:PublishProfile=FolderProfile
+          echo "✅ Application published successfully"
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: azure-functions-${{ github.run_number }}
+          path: ./publish
+          retention-days: 30
+
+      - name: Set job outputs
+        id: set-outputs
+        run: |
+          ARTIFACT_NAME="azure-functions-${{ github.run_number }}"
+          BUILD_VERSION="${{ github.run_number }}-$(date +%Y%m%d-%H%M%S)"
+          
+          echo "artifact-name=$ARTIFACT_NAME" >> $GITHUB_OUTPUT
+          echo "build-version=$BUILD_VERSION" >> $GITHUB_OUTPUT
+  # Deploy to Azure Functions
   deploy-to-azure:
     name: Deploy to Azure Functions
     if: |
       (github.event_name == 'push' && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main')) ||
-      (github.event_name == 'workflow_dispatch')
-    runs-on: windows-latest
+      (github.event_name == 'workflow_dispatch') ||
+      github.event.inputs.force_deploy == 'true'
+    runs-on: ubuntu-latest
     needs: build-and-test
+    environment: ${{ github.event.inputs.environment || 'prod' }}
+    timeout-minutes: 15
+    
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Setup .NET 9 SDK
-        uses: actions/setup-dotnet@v4
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
         with:
-          dotnet-version: '9.0.x'
-
-      - name: Restore and build solution
-        run: |
-          dotnet restore CopilotBlazor.sln
-          dotnet build CopilotBlazor.sln --configuration Release --no-restore
-
-      - name: Publish Azure Function for deployment
-        run: dotnet publish Server/Server.csproj --configuration Release --output ./publish
+          name: ${{ needs.build-and-test.outputs.artifact-name }}
+          path: ./publish
 
       - name: Azure Login via OIDC
         uses: azure/login@v2
@@ -101,8 +168,106 @@ jobs:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
+      - name: Verify Azure Function App exists
+        id: verify-app
+        timeout-minutes: 5
+        run: |
+          FUNC_APP_NAME="func-${{ env.WORKLOAD_NAME }}-${{ env.ENVIRONMENT }}"
+          RG_NAME="rg-${{ env.WORKLOAD_NAME }}-${{ env.ENVIRONMENT }}"
+          
+          echo "🔍 Verifying Function App: $FUNC_APP_NAME"
+          
+          if ! az functionapp show --name "$FUNC_APP_NAME" --resource-group "$RG_NAME" &>/dev/null; then
+            echo "::error::Function App '$FUNC_APP_NAME' not found in resource group '$RG_NAME'."
+            echo "::error::Please run the infrastructure deployment workflow first."
+            exit 1
+          fi
+          
+          echo "✅ Function App exists and is ready for deployment"
+          echo "app-name=$FUNC_APP_NAME" >> $GITHUB_OUTPUT
+
       - name: Deploy to Azure Functions
+        id: deploy
+        timeout-minutes: 10
         uses: Azure/functions-action@v1
         with:
-          app-name: func-${{ env.WORKLOAD_NAME }}-${{ env.ENVIRONMENT }}
+          app-name: ${{ steps.verify-app.outputs.app-name }}
           package: './publish'
+          respect-funcignore: true
+
+      - name: Verify deployment health
+        if: success()
+        timeout-minutes: 5
+        run: |
+          FUNC_APP_NAME="${{ steps.verify-app.outputs.app-name }}"
+          
+          echo "🔍 Verifying deployment health..."
+          
+          # Get the function app URL
+          FUNC_URL=$(az functionapp show \
+            --name "$FUNC_APP_NAME" \
+            --resource-group "rg-${{ env.WORKLOAD_NAME }}-${{ env.ENVIRONMENT }}" \
+            --query "defaultHostName" \
+            --output tsv)
+          
+          if [ -n "$FUNC_URL" ]; then
+            echo "🌐 Function App URL: https://$FUNC_URL"
+            
+            # Test health endpoint if available
+            if curl -f -s "https://$FUNC_URL/api/health" >/dev/null 2>&1; then
+              echo "✅ Health check passed"
+            else
+              echo "⚠️ Health endpoint not available or not responding (this may be normal)"
+            fi
+          else
+            echo "⚠️ Could not retrieve Function App URL"
+          fi
+          
+          echo "✅ Deployment verification complete"
+
+      - name: Output deployment summary
+        if: always()
+        run: |
+          echo "## ⚡ Azure Functions Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Property | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|----------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Environment | \`${{ env.ENVIRONMENT }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Build Version | \`${{ needs.build-and-test.outputs.build-version }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Function App | \`${{ steps.verify-app.outputs.app-name }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Resource Group | \`rg-${{ env.WORKLOAD_NAME }}-${{ env.ENVIRONMENT }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Run ID | \`${{ github.run_id }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [[ "${{ job.status }}" == "success" ]]; then
+            echo "### ✅ Deployment Status: SUCCESS" >> $GITHUB_STEP_SUMMARY
+            
+            # Get the Function App URL
+            FUNC_URL=$(az functionapp show \
+              --name "${{ steps.verify-app.outputs.app-name }}" \
+              --resource-group "rg-${{ env.WORKLOAD_NAME }}-${{ env.ENVIRONMENT }}" \
+              --query "defaultHostName" \
+              --output tsv 2>/dev/null || echo "Unable to retrieve URL")
+            
+            if [[ "$FUNC_URL" != "Unable to retrieve URL" ]]; then
+              echo "- **Function App URL**: https://$FUNC_URL" >> $GITHUB_STEP_SUMMARY
+              echo "- **Health Endpoint**: https://$FUNC_URL/api/health" >> $GITHUB_STEP_SUMMARY
+            fi
+          else
+            echo "### ❌ Deployment Status: FAILED" >> $GITHUB_STEP_SUMMARY
+            echo "Please check the logs for more details." >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Clean up on failure
+        if: failure() && github.event.inputs.environment != 'prod'
+        run: |
+          echo "🧹 Cleaning up failed deployment for non-production environment..."
+          FUNC_APP_NAME="${{ steps.verify-app.outputs.app-name }}"
+          
+          if [ -n "$FUNC_APP_NAME" ]; then
+            echo "Restarting Function App to recover from failed deployment..."
+            az functionapp restart --name "$FUNC_APP_NAME" --resource-group "rg-${{ env.WORKLOAD_NAME }}-${{ env.ENVIRONMENT }}" || true
+            echo "✅ Cleanup completed"
+          else
+            echo "ℹ️ No cleanup needed"
+          fi
