@@ -60,8 +60,7 @@ jobs:
       artifact-name: ${{ steps.set-outputs.outputs.artifact-name }}
       build-version: ${{ steps.set-outputs.outputs.build-version }}
     
-    steps:
-      - name: Checkout repository
+    steps:      - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
@@ -236,7 +235,7 @@ jobs:
       - name: Output deployment summary
         if: always()
         run: |
-          echo "## Deploy Blazor Client Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "## [deploy] Blazor Client Deployment Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "| Property | Value |" >> $GITHUB_STEP_SUMMARY
           echo "|----------|-------|" >> $GITHUB_STEP_SUMMARY
@@ -248,7 +247,7 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           
           if [[ "${{ job.status }}" == "success" ]]; then
-            echo "### Success Deployment Status: SUCCESS" >> $GITHUB_STEP_SUMMARY
+            echo "### [success] Deployment Status: SUCCESS" >> $GITHUB_STEP_SUMMARY
             
             # Get the Static Web App URL
             SWA_URL=$(az staticwebapp show \
@@ -261,7 +260,7 @@ jobs:
               echo "- **Application URL**: https://$SWA_URL" >> $GITHUB_STEP_SUMMARY
             fi
           else
-            echo "### Error Deployment Status: FAILED" >> $GITHUB_STEP_SUMMARY
+            echo "### [error] Deployment Status: FAILED" >> $GITHUB_STEP_SUMMARY
             echo "Please check the logs for more details." >> $GITHUB_STEP_SUMMARY
           fi
 
@@ -314,10 +313,10 @@ jobs:
       - name: Cleanup summary
         if: always()
         run: |
-          echo "## Cleanup Pull Request Cleanup Summary" >> $GITHUB_STEP_SUMMARY
+          echo "## [cleanup] Pull Request Cleanup Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           if [[ "${{ steps.token.outputs.value }}" != "" ]]; then
-            echo "Success Pull request environment cleanup completed successfully" >> $GITHUB_STEP_SUMMARY
+            echo "[success] Pull request environment cleanup completed successfully" >> $GITHUB_STEP_SUMMARY
           else
-            echo "Warning Pull request environment cleanup skipped (Static Web App not found)" >> $GITHUB_STEP_SUMMARY
+            echo "[warning] Pull request environment cleanup skipped (Static Web App not found)" >> $GITHUB_STEP_SUMMARY
           fi
