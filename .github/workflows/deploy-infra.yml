@@ -20,7 +20,6 @@ on:
     paths:
       - 'Infra/**'
       - '.github/workflows/deploy-infra.yml'
-      - '.github/workflows/deploy-infra.yml'
 
 permissions:
   id-token: write
@@ -51,7 +50,10 @@ jobs:
           RG_NAME="rg-${{ env.WORKLOAD_NAME }}-${{ env.ENVIRONMENT }}"
           
           az group create \
-            --name "$RG_NAME" \            --location ${{ env.LOCATION }} \            --tags \              Environment=${{ env.ENVIRONMENT }} \
+            --name "$RG_NAME" \
+            --location ${{ env.LOCATION }} \
+            --tags \
+              Environment=${{ env.ENVIRONMENT }} \
               Workload=${{ env.WORKLOAD_NAME }} \
               ManagedBy="GitHub Actions" \
               Repository="${{ github.repository }}" \
@@ -87,4 +89,4 @@ jobs:
           echo "Static Web App: ${{ steps.deploy.outputs.staticWebAppName }}"
           echo "Static Web App URL: https://${{ steps.deploy.outputs.staticWebAppUrl }}"
           echo ""
-          echo "⚠️  Note: Static Web App API linking is disabled by default to prevent deployment timeouts."          echo "🔗 Note: Static Web App API linking is now enabled in the Bicep template."
+          echo "🔗 Note: Static Web App API linking is now enabled in the Bicep template."

@@ -14,18 +14,14 @@ public class HealthCheckFunction : IHealthCheck
     public HealthCheckFunction(ILogger<HealthCheckFunction> logger)
     {
         _logger = logger;
-    }
-
-    public async Task<HealthCheckResult> CheckHealthAsync(
+    }    public Task<HealthCheckResult> CheckHealthAsync(
         HealthCheckContext context,
         CancellationToken cancellationToken = default)
     {
         _logger.LogInformation("Performing health check");
         // Add actual health check logic here
-        return HealthCheckResult.Healthy("All systems operational");
-    }
-
-    [Function("HealthCheck")]
+        return Task.FromResult(HealthCheckResult.Healthy("All systems operational"));
+    }[Function("HealthCheck")]
     public async Task<HttpResponseData> HttpHealthCheck(
         [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "health")] HttpRequestData req,
         HealthCheckService healthCheckService)
