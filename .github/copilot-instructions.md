@@ -16,3 +16,13 @@ Check for successful runs and also check the used resources in azure for correct
 Lint all infrastructure code and use only bicep for infrastructure as code.
 Lint and test the infrastructure before deploying.
 When searching the web for solutions, prefer official documentation and trusted sources. The current year is 2025 if you need to know it.
+
+## GitHub Actions Workflow Guidelines
+**NEVER create centralized orchestrator workflows** like `main-ci-cd.yml` that try to coordinate multiple deployments or detect changes across components. Instead:
+- Use focused, single-responsibility workflows for each component (infrastructure, client, server)
+- Use path-based triggers directly in individual workflows (`paths:` in `on.push` or `on.pull_request`)
+- Each workflow should be autonomous and handle its own triggering conditions
+- Avoid complex dependency chains between workflows
+- Keep workflows simple, maintainable, and debuggable
+
+This prevents unnecessary complexity, reduces failure points, and follows modern CI/CD best practices.
