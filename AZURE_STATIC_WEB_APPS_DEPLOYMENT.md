@@ -19,7 +19,8 @@ Before deploying, ensure you have:
    - `AZURE_TENANT_ID` 
    - `AZURE_SUBSCRIPTION_ID`
    - `AZURE_BASE_NAME` (will be set during infrastructure deployment)
-   - `AZURE_STATIC_WEB_APPS_API_TOKEN` (will be obtained during infrastructure deployment)
+
+Note: The `AZURE_STATIC_WEB_APPS_API_TOKEN` is automatically retrieved from Azure during deployment - no manual secret configuration needed!
 
 ## Deployment Steps
 
@@ -41,11 +42,12 @@ This will:
 
 After the infrastructure deployment completes:
 
-1. Copy the `AZURE_STATIC_WEB_APPS_API_TOKEN` value from the workflow output
+1. Copy the `AZURE_BASE_NAME` value from the workflow output
 2. Go to your repository **Settings** > **Secrets and variables** > **Actions**
-3. Add/update the following secrets:
-   - `AZURE_STATIC_WEB_APPS_API_TOKEN`: Use the token from step 1
+3. Add/update the secret:
    - `AZURE_BASE_NAME`: Use the base name from the infrastructure deployment output
+
+The deployment token is automatically retrieved from Azure during the Static Web Apps deployment - no manual configuration needed!
 
 ### 3. Deploy Blazor Application
 

@@ -35,11 +35,34 @@ jobs:
 
       - name: Validate required secrets
         run: |
-          if [ -z "${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}" ]; then
-            echo "::error::AZURE_STATIC_WEB_APPS_API_TOKEN secret is required but not set."
-            echo "::error::Please run the infrastructure deployment first to create the Static Web App resource."
+          if [ -z "${{ secrets.AZURE_BASE_NAME }}" ]; then
+            echo "::error::AZURE_BASE_NAME secret is required but not set."
+            echo "::error::Please run the infrastructure deployment first and set this secret."
             exit 1
           fi
+
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Get Static Web Apps deployment token
+        id: swa-token
+        run: |
+          RESOURCE_GROUP="${{ secrets.AZURE_BASE_NAME }}"
+          # Get the Static Web App name from the resource group (there should be only one)
+          SWA_NAME=$(az staticwebapp list --resource-group "$RESOURCE_GROUP" --query "[0].name" --output tsv)
+          if [ -z "$SWA_NAME" ] || [ "$SWA_NAME" = "null" ]; then
+            echo "::error::No Static Web App found in resource group $RESOURCE_GROUP"
+            echo "::error::Please ensure the infrastructure has been deployed first"
+            exit 1
+          fi
+          echo "Found Static Web App: $SWA_NAME"
+          SWA_TOKEN=$(az staticwebapp secrets list --name "$SWA_NAME" --resource-group "$RESOURCE_GROUP" --query "properties.apiKey" --output tsv)
+          echo "::add-mask::$SWA_TOKEN"
+          echo "token=$SWA_TOKEN" >> $GITHUB_OUTPUT
 
       - name: Restore dependencies
         run: dotnet restore Client/Client.csproj
@@ -51,7 +74,7 @@ jobs:
         id: builddeploy
         uses: Azure/static-web-apps-deploy@v1
         with:
-          azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
+          azure_static_web_apps_api_token: ${{ steps.swa-token.outputs.token }}
           repo_token: ${{ secrets.GITHUB_TOKEN }} # Used for GitHub integrations (i.e. PR comments)
           action: "upload"
           ###### Repository/Build Configurations ######
@@ -61,15 +84,39 @@ jobs:
           ###### End of Repository/Build Configurations ######
           app_build_command: 'dotnet publish --configuration Release --output ../dist'
           skip_api_build: true # We use linked Azure Functions for API
+
   close_pull_request:
     if: github.event_name == 'pull_request' && github.event.action == 'closed'
     runs-on: ubuntu-latest
     name: Close Pull Request Job
     steps:
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Get Static Web Apps deployment token
+        id: swa-token
+        run: |
+          RESOURCE_GROUP="${{ secrets.AZURE_BASE_NAME }}"
+          # Get the Static Web App name from the resource group (there should be only one)
+          SWA_NAME=$(az staticwebapp list --resource-group "$RESOURCE_GROUP" --query "[0].name" --output tsv)
+          if [ -z "$SWA_NAME" ] || [ "$SWA_NAME" = "null" ]; then
+            echo "::error::No Static Web App found in resource group $RESOURCE_GROUP"
+            echo "::error::Please ensure the infrastructure has been deployed first"
+            exit 1
+          fi
+          echo "Found Static Web App: $SWA_NAME"
+          SWA_TOKEN=$(az staticwebapp secrets list --name "$SWA_NAME" --resource-group "$RESOURCE_GROUP" --query "properties.apiKey" --output tsv)
+          echo "::add-mask::$SWA_TOKEN"
+          echo "token=$SWA_TOKEN" >> $GITHUB_OUTPUT
+
       - name: Close Pull Request
         id: closepullrequest
         uses: Azure/static-web-apps-deploy@v1
         with:
-          azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
+          azure_static_web_apps_api_token: ${{ steps.swa-token.outputs.token }}
           action: "close"
           app_location: "/Client"

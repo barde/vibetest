@@ -84,11 +84,12 @@ The application deploys to Azure Static Web Apps for the frontend and Azure Func
    - Go to Actions → "Deploy Azure Infra (Bicep)" → Run workflow
    - Copy the deployment outputs to configure additional secrets
 
-3. **Add Static Web Apps Secret**:
+3. **Add Required Secret**:
    ```
-   AZURE_STATIC_WEB_APPS_API_TOKEN    # From infrastructure deployment output
    AZURE_BASE_NAME                    # From infrastructure deployment output
    ```
+
+   The Static Web Apps deployment token is automatically retrieved from Azure - no manual configuration needed!
 
 4. **Deploy Application**:
    - Push to main/master branch to trigger automatic deployment
