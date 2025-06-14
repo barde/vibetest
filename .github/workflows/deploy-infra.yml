@@ -15,11 +15,6 @@ on:
         - dev
         - test
         - prod
-      enable_api_linking:
-        description: 'Enable Static Web App API linking (may cause long deployments)'
-        required: false
-        default: false
-        type: boolean
   push:
     branches: [ master, main ]
     paths:
@@ -56,8 +51,7 @@ jobs:
           RG_NAME="rg-${{ env.WORKLOAD_NAME }}-${{ env.ENVIRONMENT }}"
           
           az group create \
-            --name "$RG_NAME" \            --location ${{ env.LOCATION }} \            --tags \
-              Environment=${{ env.ENVIRONMENT }} \
+            --name "$RG_NAME" \            --location ${{ env.LOCATION }} \            --tags \              Environment=${{ env.ENVIRONMENT }} \
               Workload=${{ env.WORKLOAD_NAME }} \
               ManagedBy="GitHub Actions" \
               Repository="${{ github.repository }}" \
@@ -65,17 +59,17 @@ jobs:
 
       - name: Deploy Bicep Template
         id: deploy
-        timeout-minutes: 10
+        timeout-minutes: 15
         uses: azure/arm-deploy@v1
         with:
           scope: resourcegroup
           subscriptionId: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
           resourceGroupName: rg-${{ env.WORKLOAD_NAME }}-${{ env.ENVIRONMENT }}
           template: Infra/main.bicep
+          deploymentMode: Incremental
           parameters: >
             workloadName=${{ env.WORKLOAD_NAME }}
             environment=${{ env.ENVIRONMENT }}
-            enableApiLinking=${{ github.event.inputs.enable_api_linking || false }}
           failOnStdErr: false
 
       - name: Output deployment summary
@@ -93,13 +87,4 @@ jobs:
           echo "Static Web App: ${{ steps.deploy.outputs.staticWebAppName }}"
           echo "Static Web App URL: https://${{ steps.deploy.outputs.staticWebAppUrl }}"
           echo ""
-          echo "⚠️  Note: Static Web App API linking is disabled by default to prevent deployment timeouts."
-          echo "   You can manually link the API in Azure Portal or enable it via the 'enableApiLinking' parameter."
-
-      - name: Optional API Linking (if needed)
-        if: ${{ github.event.inputs.enable_api_linking == 'true' }}
-        run: |
-          echo "🔗 Linking Static Web App to Azure Functions..."
-          # This step can be enabled manually if API linking is required
-          # It's separated to prevent the main deployment from timing out
-          echo "API linking would be performed here if enabled"
+          echo "⚠️  Note: Static Web App API linking is disabled by default to prevent deployment timeouts."          echo "🔗 Note: Static Web App API linking is now enabled in the Bicep template."
