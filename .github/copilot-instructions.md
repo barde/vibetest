@@ -13,3 +13,5 @@ Use the `dotnet ef` CLI for database migrations and updates.
 The commit messages should be clear and descriptive, following the conventional commits style.
 after pushing changes to the main branch, the GitHub Actions workflows will automatically trigger deployments to Azure Static Web Apps and Azure Functions. 
 Check for successful runs and also check the used resources in azure for correct configuration.
+Lint all infrastructure code and use only bicep for infrastructure as code.
+Lint and test the infrastructure before deploying.

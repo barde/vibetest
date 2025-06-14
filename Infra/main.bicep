@@ -1,21 +1,38 @@
 // main.bicep
 // Deploys an Azure Function App, Storage Account, and Key Vault with best practices
+// Following Azure CAF naming conventions: <resource-type>-<workload>-<environment>-<instance>
 
 param location string = resourceGroup().location
-param baseName string = 'copilotblazor'
+@minLength(3)
+@maxLength(12) // Ensure storage account name stays within 24 char limit: st(2) + baseName(12) + environment(4) + locationAbbr(4) + instance(3) = 25, need to optimize
+param baseName string = 'cpltst' // Shortened to fit naming constraints
+@allowed(['dev', 'test', 'prod'])
 param environment string = 'prod'
 param skuName string = 'Y1' // Consumption plan for Functions
+@minLength(3)
+@maxLength(3)
+param instance string = '001' // Instance identifier for resource naming
 
-// Generate unique resource names using base name and unique string
-var uniqueSuffix = substring(uniqueString(resourceGroup().id), 0, 8)
-var functionAppName = '${baseName}-func-${environment}-${uniqueSuffix}'
-var storageAccountName = '${substring(baseName, 0, min(length(baseName), 10))}${uniqueSuffix}' // Simplified for storage naming requirements
-var keyVaultName = '${baseName}-kv-${uniqueSuffix}' // Simplified for KV naming requirements (3-24 chars, no consecutive hyphens)
-var staticWebAppName = '${baseName}-swa-${environment}-${uniqueSuffix}'
+// Location abbreviation mapping for consistent naming
+var locationAbbreviations = {
+  westeurope: 'we'
+  eastus: 'eus'
+  westus2: 'wus2'
+  centralus: 'cus'
+  northeurope: 'ne'
+  southcentralus: 'scus'
+}
+var locationAbbr = locationAbbreviations[?location] ?? 'unk'
+
+// Azure CAF compliant resource names
+var functionAppName = 'func-${baseName}-${environment}-${locationAbbr}-${instance}'
+var storageAccountName = 'st${baseName}${environment}${locationAbbr}${instance}' // Storage: no hyphens, 3-24 chars
+var keyVaultName = 'kv-${baseName}-${locationAbbr}${instance}' // Key Vault: 3-24 chars, simplified for length
+var staticWebAppName = 'swa-${baseName}-${environment}-${locationAbbr}-${instance}'
 
 // Application Insights
 resource appInsights 'Microsoft.Insights/components@2020-02-02' = {
-  name: '${functionAppName}-ai'
+  name: 'appi-${baseName}-${environment}-${locationAbbr}-${instance}'
   location: location
   kind: 'web'
   properties: {
@@ -84,7 +101,7 @@ resource keyVault 'Microsoft.KeyVault/vaults@2023-02-01' = {
 
 // App Service Plan for Function
 resource plan 'Microsoft.Web/serverfarms@2023-01-01' = {
-  name: '${functionAppName}-plan'
+  name: 'asp-${baseName}-${environment}-${locationAbbr}-${instance}'
   location: location
   sku: {
     name: skuName
