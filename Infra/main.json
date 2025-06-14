@@ -5,7 +5,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.36.1.42791",
-      "templateHash": "14276404293108220813"
+      "templateHash": "11188727223800285635"
     }
   },
   "parameters": {
@@ -29,8 +29,8 @@
   "variables": {
     "uniqueSuffix": "[substring(uniqueString(resourceGroup().id), 0, 8)]",
     "functionAppName": "[format('{0}-func-{1}-{2}', parameters('baseName'), parameters('environment'), variables('uniqueSuffix'))]",
-    "storageAccountName": "[format('{0}st{1}{2}', parameters('baseName'), parameters('environment'), variables('uniqueSuffix'))]",
-    "keyVaultName": "[format('{0}-kv-{1}-{2}', parameters('baseName'), parameters('environment'), variables('uniqueSuffix'))]",
+    "storageAccountName": "[format('{0}{1}', substring(parameters('baseName'), 0, min(length(parameters('baseName')), 10)), variables('uniqueSuffix'))]",
+    "keyVaultName": "[format('{0}-kv-{1}', parameters('baseName'), variables('uniqueSuffix'))]",
     "staticWebAppName": "[format('{0}-swa-{1}-{2}', parameters('baseName'), parameters('environment'), variables('uniqueSuffix'))]"
   },
   "resources": [
@@ -280,8 +280,8 @@
         "tier": "Free"
       },
       "properties": {
-        "repositoryUrl": "",
-        "branch": "main",
+        "repositoryUrl": "https://github.com/barde/vibetest",
+        "branch": "master",
         "buildProperties": {
           "appLocation": "/Client",
           "apiLocation": "",
