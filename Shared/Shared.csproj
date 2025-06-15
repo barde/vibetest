@@ -13,14 +13,9 @@
     <Copyright>AI Generated - Educational Use Only</Copyright>
   </PropertyGroup>
 
-  <PropertyGroup Condition="'$(TargetFramework)' == 'net9.0' AND '$(RuntimeIdentifier)' == 'browser-wasm'">
-    <DefineConstants>$(DefineConstants);BROWSER_WASM</DefineConstants>
-  </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="System.ComponentModel.Annotations" Version="5.0.0" />
     <PackageReference Include="System.Text.Json" Version="9.0.0" />
-    <PackageReference Include="Microsoft.OpenApi" Version="1.6.22" Condition="'$(TargetFramework)' != 'net9.0' OR '$(RuntimeIdentifier)' != 'browser-wasm'" />
-    <PackageReference Include="Swashbuckle.AspNetCore.Annotations" Version="7.2.0" Condition="'$(TargetFramework)' != 'net9.0' OR '$(RuntimeIdentifier)' != 'browser-wasm'" />
   </ItemGroup>
 
 </Project>
