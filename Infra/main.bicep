@@ -89,7 +89,8 @@ resource keyVault 'Microsoft.KeyVault/vaults@2023-02-01' = {
     networkAcls: {
       bypass: 'AzureServices'
       defaultAction: 'Allow'
-    }  }
+    }
+  }
   tags: {
     environment: environment
   }
@@ -116,7 +117,9 @@ resource functionApp 'Microsoft.Web/sites@2023-01-01' = {
   }
   properties: {
     serverFarmId: plan.id
-    siteConfig: {      appSettings: [        {
+    siteConfig: {
+      appSettings: [
+        {
           name: 'AzureWebJobsStorage'
           value: 'DefaultEndpointsProtocol=https;AccountName=${storage.name};EndpointSuffix=${az.environment().suffixes.storage};AccountKey=${storage.listKeys().keys[0].value}'
         }
@@ -142,7 +145,9 @@ resource functionApp 'Microsoft.Web/sites@2023-01-01' = {
         }
         {
           name: 'ApplicationInsightsAgent_EXTENSION_VERSION'
-          value: '~3'        }      ]
+          value: '~3'
+        }
+      ]
       ftpsState: 'Disabled'
       minTlsVersion: '1.2'
     }
@@ -187,7 +192,7 @@ resource staticWebApp 'Microsoft.Web/staticSites@2023-01-01' = {
   tags: {
     environment: environment
     'app-type': 'blazor-wasm'
-    'purpose': 'client-hosting'
+    purpose: 'client-hosting'
   }
 }
 
@@ -206,9 +211,9 @@ resource staticWebAppSettings 'Microsoft.Web/staticSites/config@2023-01-01' = {
   name: 'appsettings'
   properties: {
     // Add the Function App URL as an app setting for the client to use
-    'API_URL': 'https://${functionApp.properties.defaultHostName}/api'
+    API_URL: 'https://${functionApp.properties.defaultHostName}/api'
     // Add Application Insights key for client-side monitoring (optional)
-    'APPINSIGHTS_INSTRUMENTATIONKEY': appInsights.properties.InstrumentationKey
+    APPINSIGHTS_INSTRUMENTATIONKEY: appInsights.properties.InstrumentationKey
   }
 }
 
