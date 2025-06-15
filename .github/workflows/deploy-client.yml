@@ -77,7 +77,6 @@ jobs:
           echo "[sync] Installing WebAssembly workloads..."
           dotnet workload update
           dotnet workload install wasm-tools
-          dotnet workload install blazorwebassembly-aot
           echo "[success] WASM workloads installed successfully"
 
       - name: Cache NuGet packages
