@@ -54,6 +54,20 @@ Uses **GitHub Actions with OIDC** for secure, keyless deployment - no long-lived
 - 🌐 `deploy-client.yml` - Frontend (when `Client/` changes)  
 - ⚡ `deploy-server.yml` - Backend (when `Server/` changes)
 
+## 🔑 Required GitHub Secrets
+
+To enable GitHub Actions workflows for deployment, set the following secrets in your repository:
+
+| Secret Name                     | Description                                                                 |
+|---------------------------------|-----------------------------------------------------------------------------|
+| `AZURE_CLIENT_ID`               | Azure Service Principal Client ID                                          |
+| `AZURE_TENANT_ID`               | Azure Active Directory Tenant ID                                           |
+| `AZURE_SUBSCRIPTION_ID`         | Azure Subscription ID                                                      |
+| `AZURE_FUNCTIONAPP_NAME`        | Name of the Azure Function App (required for server deployment)            |
+| `AZURE_RESOURCE_GROUP`          | Name of the Azure Resource Group                                           |
+
+Ensure these secrets are correctly configured before running the workflows.
+
 ## 📖 API Endpoints
 
 | Endpoint | Description |
