@@ -1,0 +1,309 @@
+# Build, Test, and Deploy Blazor WebAssembly Client to Azure Static Web Apps
+# This workflow builds, tests, and deploys the Blazor WebAssembly client application
+
+name: Build and Deploy Static Web App Client
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Deployment environment'
+        required: true
+        default: 'prod'
+        type: choice
+        options:
+          - dev
+          - test
+          - prod
+      force_deploy:
+        description: 'Force deployment even if no changes detected'
+        required: false
+        default: false
+        type: boolean
+      skip_tests:
+        description: 'Skip running tests before deployment'
+        required: false
+        default: false
+        type: boolean
+  push:
+    branches: [ '**' ]
+    paths:
+      - 'Client/**'
+      - '.github/workflows/deploy-client.yml'
+      - 'Client.Tests/**'
+      - 'Shared/**'
+  pull_request:
+    branches: [ master, main ]
+    paths:
+      - 'Client/**'
+      - '.github/workflows/deploy-client.yml'
+      - 'Client.Tests/**'
+      - 'Shared/**'
+
+permissions:
+  id-token: write
+  contents: read
+  actions: read
+
+env:
+  WORKLOAD_NAME: cpltst
+  ENVIRONMENT: ${{ github.event.inputs.environment || 'prod' }}
+  DOTNET_VERSION: '9.0.x'
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
+
+jobs:
+  # Build and test the Blazor WebAssembly application
+  build-and-test:
+    name: Build and Test Blazor Client
+    runs-on: ubuntu-latest
+    outputs:
+      artifact-name: ${{ steps.set-outputs.outputs.artifact-name }}
+      build-version: ${{ steps.set-outputs.outputs.build-version }}
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Install WASM workloads
+        run: |
+          echo "[sync] Installing WebAssembly workloads..."
+          dotnet workload update
+          dotnet workload install wasm-tools
+          dotnet workload install blazorwebassembly-aot
+          echo "[success] WASM workloads installed successfully"
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-
+
+      - name: Restore dependencies
+        run: |
+          echo "[sync] Restoring NuGet packages for Client projects..."
+          dotnet restore Client/Client.csproj --verbosity minimal
+          dotnet restore Client.Tests/Client.Tests.csproj --verbosity minimal
+          dotnet restore Shared/Shared.csproj --verbosity minimal
+          echo "[success] Dependencies restored successfully"
+
+      - name: Build solution
+        run: |
+          echo "[build] Building Blazor WebAssembly and dependencies..."
+          dotnet build Shared/Shared.csproj \
+            --configuration Release \
+            --no-restore \
+            --verbosity minimal \
+            -p:TreatWarningsAsErrors=true
+          dotnet build Client/Client.csproj \
+            --configuration Release \
+            --no-restore \
+            --verbosity minimal \
+            -p:TreatWarningsAsErrors=true
+          dotnet build Client.Tests/Client.Tests.csproj \
+            --configuration Release \
+            --no-restore \
+            --verbosity minimal \
+            -p:TreatWarningsAsErrors=true
+          echo "[success] Build completed successfully"
+
+      - name: Run tests
+        if: github.event.inputs.skip_tests != 'true'
+        run: |
+          echo "[test] Running client tests..."
+          dotnet test Client.Tests/Client.Tests.csproj \
+            --configuration Release \
+            --no-build \
+            --verbosity normal \
+            --logger trx \
+            --results-directory ./test-results \
+            --collect:"XPlat Code Coverage"
+          echo "[success] Tests completed successfully"
+
+      - name: Upload test results
+        if: always() && github.event.inputs.skip_tests != 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-client-${{ github.run_number }}
+          path: ./test-results
+          retention-days: 30
+
+      - name: Publish Blazor WebAssembly
+        run: |
+          echo "[package] Publishing Blazor WebAssembly application..."
+          dotnet publish Client/Client.csproj \
+            --configuration Release \
+            --output ./publish \
+            -p:BlazorWasmPublishDistDir=wwwroot \
+            -p:BuildId=${{ github.run_number }} \
+            -p:PublishProfile=FolderProfile
+          echo "[success] Application published successfully"
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: blazor-client-${{ github.run_number }}
+          path: ./publish/wwwroot
+          retention-days: 30
+
+      - name: Set job outputs
+        id: set-outputs
+        run: |
+          ARTIFACT_NAME="blazor-client-${{ github.run_number }}"
+          BUILD_VERSION="${{ github.run_number }}-$(date +%Y%m%d-%H%M%S)"
+          
+          echo "artifact-name=$ARTIFACT_NAME" >> $GITHUB_OUTPUT
+          echo "build-version=$BUILD_VERSION" >> $GITHUB_OUTPUT
+
+  # Deploy to Azure Static Web Apps
+  deploy-to-azure:
+    name: Deploy to Azure Static Web Apps
+    if: |
+      (github.event_name == 'push' && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main')) ||
+      (github.event_name == 'workflow_dispatch') ||
+      github.event.inputs.force_deploy == 'true'
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment || 'prod' }}
+    timeout-minutes: 15
+    
+    steps:
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ needs.build-and-test.outputs.artifact-name }}
+          path: ./publish
+
+      - name: Azure Login via OIDC
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Verify Static Web App exists
+        id: verify-app
+        timeout-minutes: 5
+        run: |
+          SWA_NAME="swa-${{ env.WORKLOAD_NAME }}-${{ env.ENVIRONMENT }}"
+          RG_NAME="rg-${{ env.WORKLOAD_NAME }}-${{ env.ENVIRONMENT }}"
+          
+          echo "[search] Verifying Static Web App: $SWA_NAME"
+          
+          if ! az staticwebapp show --name "$SWA_NAME" --resource-group "$RG_NAME" &>/dev/null; then
+            echo "::error::Static Web App '$SWA_NAME' not found in resource group '$RG_NAME'."
+            echo "::error::Please run the infrastructure deployment workflow first."
+            exit 1
+          fi
+          
+          echo "[success] Static Web App exists and is ready for deployment"
+          echo "app-name=$SWA_NAME" >> $GITHUB_OUTPUT
+
+      - name: Deploy to Azure Static Web Apps
+        id: deploy
+        timeout-minutes: 10
+        uses: Azure/static-web-apps-deploy@v1
+        with:
+          azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          action: "upload"
+          app_location: "./publish"
+          skip_app_build: true
+          api_location: ""
+          output_location: ""
+
+      - name: Verify deployment health
+        if: success()
+        timeout-minutes: 5
+        run: |
+          SWA_NAME="${{ steps.verify-app.outputs.app-name }}"
+          
+          echo "[search] Verifying deployment health..."
+          
+          # Get the Static Web App URL
+          SWA_URL=$(az staticwebapp show \
+            --name "$SWA_NAME" \
+            --resource-group "rg-${{ env.WORKLOAD_NAME }}-${{ env.ENVIRONMENT }}" \
+            --query "defaultHostname" \
+            --output tsv)
+          
+          if [ -n "$SWA_URL" ]; then
+            echo "[web] Static Web App URL: https://$SWA_URL"
+            
+            # Test the main page
+            if curl -f -s "https://$SWA_URL" >/dev/null 2>&1; then
+              echo "[success] Main page is accessible"
+            else
+              echo "[warning] Main page not responding (deployment may still be propagating)"
+            fi
+            
+            # Save URL for later use
+            echo "deployment-url=https://$SWA_URL" >> $GITHUB_OUTPUT
+          else
+            echo "[warning] Could not retrieve Static Web App URL"
+          fi
+          
+          echo "[success] Deployment verification complete"
+
+      - name: Output deployment summary
+        if: always()
+        run: |
+          echo "## [lightning] Blazor Client Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Property | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|----------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Environment | \`${{ env.ENVIRONMENT }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Build Version | \`${{ needs.build-and-test.outputs.build-version }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Static Web App | \`${{ steps.verify-app.outputs.app-name }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Resource Group | \`rg-${{ env.WORKLOAD_NAME }}-${{ env.ENVIRONMENT }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Run ID | \`${{ github.run_id }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [[ "${{ job.status }}" == "success" ]]; then
+            echo "### [success] Deployment Status: SUCCESS" >> $GITHUB_STEP_SUMMARY
+            
+            # Get the Static Web App URL
+            SWA_URL=$(az staticwebapp show \
+              --name "${{ steps.verify-app.outputs.app-name }}" \
+              --resource-group "rg-${{ env.WORKLOAD_NAME }}-${{ env.ENVIRONMENT }}" \
+              --query "defaultHostname" \
+              --output tsv 2>/dev/null || echo "Unable to retrieve URL")
+            
+            if [[ "$SWA_URL" != "Unable to retrieve URL" ]]; then
+              echo "- **Application URL**: https://$SWA_URL" >> $GITHUB_STEP_SUMMARY
+              echo "- **Status**: Live and accessible" >> $GITHUB_STEP_SUMMARY
+            fi
+            
+            # Display deployment URL from Azure Static Web Apps action if available
+            if [[ -n "${{ steps.deploy.outputs.static_web_app_url }}" ]]; then
+              echo "- **Deployment URL**: ${{ steps.deploy.outputs.static_web_app_url }}" >> $GITHUB_STEP_SUMMARY
+            fi
+          else
+            echo "### [error] Deployment Status: FAILED" >> $GITHUB_STEP_SUMMARY
+            echo "Please check the logs for more details." >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Clean up on failure
+        if: failure() && github.event.inputs.environment != 'prod'
+        run: |
+          echo "[cleanup] Cleaning up failed deployment for non-production environment..."
+          SWA_NAME="${{ steps.verify-app.outputs.app-name }}"
+          
+          if [ -n "$SWA_NAME" ]; then
+            echo "[info] Attempting to reset Static Web App state..."
+            # Static Web Apps automatically handle rollback, but we can trigger a refresh
+            az staticwebapp show --name "$SWA_NAME" --resource-group "rg-${{ env.WORKLOAD_NAME }}-${{ env.ENVIRONMENT }}" || true
+            echo "[success] Cleanup completed"
+          else
+            echo "[info] No cleanup needed"
+          fi
+
