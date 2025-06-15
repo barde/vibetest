@@ -1,0 +1,57 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Build Client",
+			"type": "shell",
+			"command": "dotnet build Client/Client.csproj --configuration Release",
+			"group": "build",
+			"problemMatcher": "$msCompile"
+		},
+		{
+			"label": "Run Client",
+			"type": "shell",
+			"command": "dotnet run --project Client/Client.csproj",
+			"group": "test",
+			"problemMatcher": "$msCompile"
+		},
+		{
+			"label": "Build Server",
+			"type": "shell",
+			"command": "dotnet build Server/Server.csproj --configuration Release",
+			"group": "build",
+			"problemMatcher": "$msCompile"
+		},
+		{
+			"label": "Run Server",
+			"type": "shell",
+			"command": "dotnet run --project Server/Server.csproj",
+			"group": "test",
+			"problemMatcher": "$msCompile"
+		},
+		{
+			"type": "shell",
+			"label": "Run All Tests",
+			"command": "dotnet test CopilotBlazor.sln",
+			"group": "test",
+			"isBackground": false,
+			"problemMatcher": [
+				"$msCompile"
+			]
+		},
+		{
+			"label": "Build Entire Application",
+			"type": "shell",
+			"command": "dotnet build CopilotBlazor.sln --configuration Release",
+			"group": "build",
+			"problemMatcher": "$msCompile"
+		},
+		{
+			"label": "Run Entire Application",
+			"type": "shell",
+			"command": "dotnet run --project Server/Server.csproj",
+			"group": "test",
+			"problemMatcher": "$msCompile"
+		}
+	]
+}
