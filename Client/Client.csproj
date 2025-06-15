@@ -6,6 +6,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <RuntimeIdentifier>browser-wasm</RuntimeIdentifier>
     <DisableImplicitFrameworkReferences>true</DisableImplicitFrameworkReferences>
+    <ExcludeFrameworkReferences>Microsoft.AspNetCore.App</ExcludeFrameworkReferences>
   </PropertyGroup>
 
   <ItemGroup>
