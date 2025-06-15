@@ -1,5 +1,5 @@
 // main.bicep
-// Deploys an Azure Function App, Storage Account, and Key Vault with best practices
+// Deploys an Azure Function App, Storage Account, Key Vault, and Static Web App with best practices
 // Simplified naming convention for West Europe deployment
 
 @description('The workload name identifier')
@@ -21,6 +21,7 @@ var location = 'westeurope'
 var functionAppName = 'func-${workloadName}-${environment}'
 var storageAccountName = 'st${workloadName}${environment}' // Storage: no hyphens, 3-24 chars
 var keyVaultName = 'kv-${workloadName}-${environment}' // Key Vault: 3-24 chars
+var staticWebAppName = 'swa-${workloadName}-${environment}' // Static Web App: Azure CAF naming
 
 // Application Insights
 resource appInsights 'Microsoft.Insights/components@2020-02-02' = {
@@ -153,6 +154,64 @@ resource functionApp 'Microsoft.Web/sites@2023-01-01' = {
   }
 }
 
+// Azure Static Web App for Blazor WebAssembly Client
+// This hosts the Blazor WebAssembly client application
+// Using Free tier for initial deployment
+resource staticWebApp 'Microsoft.Web/staticSites@2023-01-01' = {
+  name: staticWebAppName
+  location: location
+  sku: {
+    name: 'Free'
+    tier: 'Free'
+  }
+  properties: {
+    // Repository information will be configured during GitHub Actions deployment
+    repositoryUrl: ''
+    branch: ''
+    repositoryToken: ''
+    
+    // Build configuration for Blazor WebAssembly
+    buildProperties: {
+      appLocation: '/Client' // Location of the Blazor client project
+      apiLocation: '' // No API location as we use Azure Functions separately
+      outputLocation: 'wwwroot' // Blazor WebAssembly output directory
+      appArtifactLocation: 'wwwroot' // Build output directory
+    }
+    
+    // Stage environments configuration
+    stagingEnvironmentPolicy: 'Enabled'
+    allowConfigFileUpdates: true
+    provider: 'None' // Will be connected to GitHub via GitHub Actions
+    enterpriseGradeCdnStatus: 'Disabled' // Not available in Free tier
+  }
+  tags: {
+    environment: environment
+    'app-type': 'blazor-wasm'
+    'purpose': 'client-hosting'
+  }
+}
+
+// Custom domain support (optional - add your domain here if needed)
+// Note: Custom domains require manual DNS configuration
+// resource customDomain 'Microsoft.Web/staticSites/customDomains@2023-01-01' = {
+//   parent: staticWebApp
+//   name: 'www.yourdomain.com'
+//   properties: {}
+// }
+
+// Application settings for Static Web App
+// These settings can be used by the Blazor client for configuration
+resource staticWebAppSettings 'Microsoft.Web/staticSites/config@2023-01-01' = {
+  parent: staticWebApp
+  name: 'appsettings'
+  properties: {
+    // Add the Function App URL as an app setting for the client to use
+    'API_URL': 'https://${functionApp.properties.defaultHostName}/api'
+    // Add Application Insights key for client-side monitoring (optional)
+    'APPINSIGHTS_INSTRUMENTATIONKEY': appInsights.properties.InstrumentationKey
+  }
+}
+
 output appInsightsName string = appInsights.name
 
 // Key Vault Access Policy for Function App (using parent property for clarity)
@@ -172,6 +231,16 @@ resource kvAccess 'Microsoft.KeyVault/vaults/accessPolicies@2023-02-01' = {
   }
 }
 
+// Outputs
 output functionAppName string = functionApp.name
 output storageAccountName string = storage.name
 output keyVaultName string = keyVault.name
+
+// Static Web App outputs
+output staticWebAppName string = staticWebApp.name
+output staticWebAppUrl string = 'https://${staticWebApp.properties.defaultHostname}'
+output staticWebAppDefaultHostname string = staticWebApp.properties.defaultHostname
+
+// Configuration endpoints for reference
+output apiEndpoint string = 'https://${functionApp.properties.defaultHostName}/api'
+output staticWebAppId string = staticWebApp.id

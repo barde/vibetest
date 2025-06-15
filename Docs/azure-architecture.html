@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Azure Architecture - CopilotBlazor</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            background-color: #f5f5f5;
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #0078D4;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .diagram {
+            width: 100%;
+            height: auto;
+            max-width: 1200px;
+            margin: 0 auto;
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Azure Architecture - CopilotBlazor Infrastructure</h1>
+        <svg class="diagram" viewBox="0 0 1400 900" xmlns="http://www.w3.org/2000/svg">
+            <!-- Background -->
+            <rect width="1400" height="900" fill="#ffffff"/>
+            
+            <!-- Title -->
+            <text x="700" y="40" font-family="Segoe UI, sans-serif" font-size="28" font-weight="600" text-anchor="middle" fill="#0078D4">CopilotBlazor Azure Architecture</text>
+            
+            <!-- Azure Region Box -->
+            <g id="region">
+                <rect x="50" y="80" width="1300" height="780" fill="#f8f9fa" stroke="#0078D4" stroke-width="2" rx="10"/>
+                <text x="70" y="110" font-family="Segoe UI, sans-serif" font-size="20" font-weight="600" fill="#0078D4">West Europe Region</text>
+            </g>
+            
+            <!-- Resource Group -->
+            <g id="resource-group">
+                <rect x="90" y="140" width="1220" height="680" fill="none" stroke="#5C2D91" stroke-width="2" stroke-dasharray="8,4" rx="8"/>
+                <text x="110" y="170" font-family="Segoe UI, sans-serif" font-size="18" font-weight="500" fill="#5C2D91">Resource Group: rg-cpltst-prod</text>
+            </g>
+            
+            <!-- Static Web App (Microsoft official icon style) -->
+            <g id="static-web-app" transform="translate(150, 250)">
+                <rect x="0" y="0" width="200" height="160" fill="#0078D4" rx="8" opacity="0.1"/>
+                <rect x="10" y="10" width="180" height="140" fill="white" stroke="#0078D4" stroke-width="2" rx="6"/>
+                <!-- Static Web App Icon (Microsoft style) -->
+                <g transform="translate(60, 35)">
+                    <rect x="0" y="0" width="70" height="50" fill="#0078D4" rx="4"/>
+                    <circle cx="20" cy="25" r="8" fill="white"/>
+                    <circle cx="35" cy="25" r="8" fill="white" opacity="0.8"/>
+                    <circle cx="50" cy="25" r="8" fill="white" opacity="0.6"/>
+                    <path d="M5 45 L65 45" stroke="white" stroke-width="2"/>
+                </g>
+                <text x="100" y="130" font-family="Segoe UI, sans-serif" font-size="14" font-weight="500" text-anchor="middle">Static Web App</text>
+                <text x="100" y="146" font-family="Segoe UI, sans-serif" font-size="12" text-anchor="middle" fill="#666">swa-cpltst-prod</text>
+            </g>
+            
+            <!-- Azure Function App -->
+            <g id="function-app" transform="translate(450, 250)">
+                <rect x="0" y="0" width="200" height="160" fill="#0062AD" rx="8" opacity="0.1"/>
+                <rect x="10" y="10" width="180" height="140" fill="white" stroke="#0062AD" stroke-width="2" rx="6"/>
+                <!-- Function Icon (Microsoft style) -->
+                <g transform="translate(65, 35)">
+                    <path d="M0 25 L15 0 L30 25 L30 15 L45 15 L30 40 L15 15 L15 25 Z" fill="#0062AD" transform="scale(1.4)"/>
+                </g>
+                <text x="100" y="130" font-family="Segoe UI, sans-serif" font-size="14" font-weight="500" text-anchor="middle">Function App</text>
+                <text x="100" y="146" font-family="Segoe UI, sans-serif" font-size="12" text-anchor="middle" fill="#666">func-cpltst-prod</text>
+            </g>
+            
+            <!-- Storage Account -->
+            <g id="storage-account" transform="translate(750, 250)">
+                <rect x="0" y="0" width="200" height="160" fill="#0072C6" rx="8" opacity="0.1"/>
+                <rect x="10" y="10" width="180" height="140" fill="white" stroke="#0072C6" stroke-width="2" rx="6"/>
+                <!-- Storage Icon (Microsoft style) -->
+                <g transform="translate(65, 35)">
+                    <rect x="0" y="0" width="70" height="50" fill="#0072C6" rx="2"/>
+                    <rect x="5" y="5" width="28" height="20" fill="white" rx="1"/>
+                    <rect x="37" y="5" width="28" height="20" fill="white" rx="1"/>
+                    <rect x="5" y="28" width="28" height="17" fill="white" rx="1"/>
+                    <rect x="37" y="28" width="28" height="17" fill="white" rx="1"/>
+                </g>
+                <text x="100" y="130" font-family="Segoe UI, sans-serif" font-size="14" font-weight="500" text-anchor="middle">Storage Account</text>
+                <text x="100" y="146" font-family="Segoe UI, sans-serif" font-size="12" text-anchor="middle" fill="#666">stcpltstprod</text>
+            </g>
+            
+            <!-- Key Vault -->
+            <g id="key-vault" transform="translate(1050, 250)">
+                <rect x="0" y="0" width="200" height="160" fill="#EC008C" rx="8" opacity="0.1"/>
+                <rect x="10" y="10" width="180" height="140" fill="white" stroke="#EC008C" stroke-width="2" rx="6"/>
+                <!-- Key Vault Icon (Microsoft style) -->
+                <g transform="translate(65, 35)">
+                    <circle cx="35" cy="25" r="25" fill="#EC008C"/>
+                    <g transform="translate(35, 25)">
+                        <rect x="-8" y="-2" width="16" height="12" rx="2" fill="white"/>
+                        <rect x="-6" y="-10" width="12" height="10" rx="6" fill="none" stroke="white" stroke-width="2"/>
+                        <circle cx="0" cy="4" r="2" fill="#EC008C"/>
+                    </g>
+                </g>
+                <text x="100" y="130" font-family="Segoe UI, sans-serif" font-size="14" font-weight="500" text-anchor="middle">Key Vault</text>
+                <text x="100" y="146" font-family="Segoe UI, sans-serif" font-size="12" text-anchor="middle" fill="#666">kv-cpltst-prod</text>
+            </g>
+            
+            <!-- App Service Plan -->
+            <g id="app-service-plan" transform="translate(450, 470)">
+                <rect x="0" y="0" width="200" height="100" fill="#59B4D9" rx="8" opacity="0.1"/>
+                <rect x="10" y="10" width="180" height="80" fill="white" stroke="#59B4D9" stroke-width="2" rx="6"/>
+                <!-- App Service Plan Icon (Microsoft style) -->
+                <g transform="translate(70, 20)">
+                    <rect x="0" y="0" width="60" height="40" fill="#59B4D9" rx="4"/>
+                    <rect x="8" y="8" width="44" height="2" fill="white"/>
+                    <rect x="8" y="14" width="44" height="2" fill="white"/>
+                    <rect x="8" y="20" width="44" height="2" fill="white"/>
+                    <rect x="8" y="26" width="24" height="2" fill="white"/>
+                    <rect x="8" y="32" width="34" height="2" fill="white"/>
+                </g>
+                <text x="100" y="75" font-family="Segoe UI, sans-serif" font-size="12" text-anchor="middle" fill="#666">asp-cpltst-prod</text>
+            </g>
+            
+            <!-- Application Insights -->
+            <g id="app-insights" transform="translate(750, 470)">
+                <rect x="0" y="0" width="200" height="160" fill="#7FBA00" rx="8" opacity="0.1"/>
+                <rect x="10" y="10" width="180" height="140" fill="white" stroke="#7FBA00" stroke-width="2" rx="6"/>
+                <!-- App Insights Icon (Microsoft style) -->
+                <g transform="translate(60, 35)">
+                    <circle cx="40" cy="25" r="22" fill="none" stroke="#7FBA00" stroke-width="5"/>
+                    <circle cx="40" cy="25" r="10" fill="#7FBA00"/>
+                    <rect x="35" y="45" width="10" height="15" fill="#7FBA00"/>
+                    <rect x="25" y="55" width="30" height="5" fill="#7FBA00"/>
+                </g>
+                <text x="100" y="130" font-family="Segoe UI, sans-serif" font-size="14" font-weight="500" text-anchor="middle">Application Insights</text>
+                <text x="100" y="146" font-family="Segoe UI, sans-serif" font-size="12" text-anchor="middle" fill="#666">appi-cpltst-prod</text>
+            </g>
+            
+            <!-- Connections -->
+            <defs>
+                <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+                    <polygon points="0 0, 10 3.5, 0 7" fill="#666"/>
+                </marker>
+            </defs>
+            
+            <!-- Static Web App to Function App -->
+            <path d="M 350 330 L 450 330" stroke="#666" stroke-width="2" stroke-dasharray="4,2" marker-end="url(#arrowhead)"/>
+            <text x="400" y="325" font-family="Segoe UI, sans-serif" font-size="11" text-anchor="middle" fill="#666">API calls</text>
+            
+            <!-- Function to Storage -->
+            <path d="M 650 330 L 750 330" stroke="#666" stroke-width="2" stroke-dasharray="4,2" marker-end="url(#arrowhead)"/>
+            
+            <!-- Function to Key Vault -->
+            <path d="M 650 330 L 1050 330" stroke="#666" stroke-width="2" stroke-dasharray="4,2" marker-end="url(#arrowhead)"/>
+            
+            <!-- Function to App Service Plan -->
+            <line x1="550" y1="410" x2="550" y2="470" stroke="#666" stroke-width="2"/>
+            
+            <!-- Function to App Insights -->
+            <path d="M 550 410 L 550 440 L 850 440 L 850 470" stroke="#666" stroke-width="2" stroke-dasharray="4,2" marker-end="url(#arrowhead)"/>
+            
+            <!-- Legend -->
+            <g transform="translate(1100, 650)">
+                <rect x="0" y="0" width="200" height="170" fill="white" stroke="#ddd" stroke-width="1" rx="4"/>
+                <text x="100" y="20" font-family="Segoe UI, sans-serif" font-size="14" font-weight="600" text-anchor="middle" fill="#333">Azure Services</text>
+                
+                <rect x="10" y="35" width="20" height="15" fill="#0078D4" rx="2"/>
+                <text x="35" y="47" font-family="Segoe UI, sans-serif" font-size="12" fill="#333">Static Web App</text>
+                
+                <rect x="10" y="55" width="20" height="15" fill="#0062AD" rx="2"/>
+                <text x="35" y="67" font-family="Segoe UI, sans-serif" font-size="12" fill="#333">Azure Functions</text>
+                
+                <rect x="10" y="75" width="20" height="15" fill="#0072C6" rx="2"/>
+                <text x="35" y="87" font-family="Segoe UI, sans-serif" font-size="12" fill="#333">Storage Account</text>
+                
+                <rect x="10" y="95" width="20" height="15" fill="#EC008C" rx="2"/>
+                <text x="35" y="107" font-family="Segoe UI, sans-serif" font-size="12" fill="#333">Key Vault</text>
+                
+                <rect x="10" y="115" width="20" height="15" fill="#7FBA00" rx="2"/>
+                <text x="35" y="127" font-family="Segoe UI, sans-serif" font-size="12" fill="#333">App Insights</text>
+                
+                <rect x="10" y="135" width="20" height="15" fill="#59B4D9" rx="2"/>
+                <text x="35" y="147" font-family="Segoe UI, sans-serif" font-size="12" fill="#333">App Service Plan</text>
+            </g>
+            
+            <!-- Notes -->
+            <g transform="translate(90, 730)">
+                <text font-family="Segoe UI, sans-serif" font-size="12" fill="#666">
+                    <tspan x="0" y="0">• Blazor WebAssembly client hosted on Static Web App (Free tier)</tspan>
+                    <tspan x="0" y="20">• Function App uses consumption plan (Y1 SKU) for serverless API</tspan>
+                    <tspan x="0" y="40">• Storage Account uses LRS replication with TLS 1.2 minimum</tspan>
+                    <tspan x="0" y="60">• Key Vault has RBAC enabled with soft delete and purge protection</tspan>
+                    <tspan x="0" y="80">• All services deployed to West Europe region using CAF naming conventions</tspan>
+                </text>
+            </g>
+        </svg>
+    </div>
+</body>
+</html>
