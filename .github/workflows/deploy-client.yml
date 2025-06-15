@@ -143,8 +143,7 @@ jobs:
             --configuration Release \
             --output ./publish \
             -p:BlazorWasmPublishDistDir=wwwroot \
-            -p:BuildId=${{ github.run_number }} \
-            -p:PublishProfile=FolderProfile
+            -p:BuildId=${{ github.run_number }}
           echo "[success] Application published successfully"
 
       - name: Upload build artifacts
