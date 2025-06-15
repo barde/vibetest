@@ -64,7 +64,7 @@ resource storage 'Microsoft.Storage/storageAccounts@2023-01-01' = {
     }
   }
   tags: {
-    environment: 'production'
+    environment: environment
   }
 }
 
